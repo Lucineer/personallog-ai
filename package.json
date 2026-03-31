@@ -1,0 +1,29 @@
+{
+  "name": "personallog-ai",
+  "version": "1.0.0",
+  "description": "Your personal AI agent, living in your repo. Fork, add keys, deploy.",
+  "type": "module",
+  "main": "src/worker.ts",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "build": "tsc --noEmit",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "ai",
+    "agent",
+    "personal",
+    "cloudflare-workers",
+    "cocapn",
+    "deepseek"
+  ],
+  "author": "Superinstance",
+  "license": "MIT",
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241205.0",
+    "typescript": "^5.7.0",
+    "wrangler": "^3.99.0"
+  }
+}
