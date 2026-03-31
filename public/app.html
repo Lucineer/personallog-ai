@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>personallog.ai — Chat</title>
+  <meta name="theme-color" content="#0a0a0a">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✨</text></svg>">
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="app">
+  <!-- Header -->
+  <header class="app-header">
+    <div class="app-brand">
+      <span style="font-size:1.3rem">✨</span>
+      <strong>personallog.ai</strong>
+    </div>
+    <div class="app-status" id="statusBar">
+      <span><span class="status-dot"></span> Online</span>
+      <span id="statusInfo">loading...</span>
+    </div>
+    <div style="display:flex;gap:0.5rem">
+      <button class="app-toggle" id="toggleFiles" title="Toggle file browser">Files</button>
+      <a href="/" class="app-toggle">Home</a>
+    </div>
+  </header>
+
+  <!-- Body -->
+  <div class="app-body">
+    <!-- Sidebar: Conversations -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <h3>Chats</h3>
+        <button class="app-toggle" id="newChat" title="New chat">+ New</button>
+      </div>
+      <ul class="sidebar-list" id="chatList">
+        <!-- Populated by JS -->
+      </ul>
+    </aside>
+
+    <!-- Chat Area -->
+    <main class="chat-area">
+      <div class="messages" id="messages">
+        <!-- Populated by JS -->
+      </div>
+
+      <div class="chat-input">
+        <button class="attach-btn" id="attachBtn" title="Attach file (coming soon)">📎</button>
+        <textarea id="input" rows="1" placeholder="Message your agent..." autofocus></textarea>
+        <button class="send-btn" id="sendBtn">➤</button>
+      </div>
+    </main>
+
+    <!-- File Browser -->
+    <aside class="file-panel collapsed" id="filePanel">
+      <div class="file-panel-header">
+        <h3>Repo Files</h3>
+        <button class="app-toggle" id="closeFiles">✕</button>
+      </div>
+      <ul class="file-tree" id="fileTree">
+        <!-- Populated by JS -->
+      </ul>
+      <div class="file-viewer" id="fileViewer" style="display:none">
+        <div class="file-panel-header" style="padding:0.5rem 0">
+          <h3 id="fileViewerTitle">file.ts</h3>
+        </div>
+        <pre id="fileViewerContent"></pre>
+      </div>
+      <div class="file-viewer-empty" id="fileViewerEmpty">
+        Click a file to view its contents
+      </div>
+    </aside>
+  </div>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>

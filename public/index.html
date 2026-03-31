@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>personallog.ai — Your AI, Living in Your Repo</title>
+  <meta name="description" content="Fork. Add keys. Deploy. Your personal AI agent is alive. Open source, self-hosted, multi-channel.">
+  <meta property="og:title" content="personallog.ai — Your AI, Living in Your Repo">
+  <meta property="og:description" content="Open source personal AI agent. Self-hosted. Multi-channel. Repo-native.">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="theme-color" content="#3b82f6">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✨</text></svg>">
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="manifest" href="/manifest.json">
+</head>
+<body class="landing">
+  <!-- Hero -->
+  <section class="hero">
+    <nav class="nav">
+      <div class="nav-brand">
+        <span class="nav-icon">✨</span>
+        <span class="nav-title">personallog.ai</span>
+      </div>
+      <div class="nav-links">
+        <a href="#features">Features</a>
+        <a href="#quickstart">Quick Start</a>
+        <a href="https://github.com/CedarBeach2019/personallog-ai" target="_blank">GitHub</a>
+        <a href="/app" class="nav-cta">Open App</a>
+      </div>
+    </nav>
+
+    <div class="hero-content fade-in">
+      <div class="hero-badge">Open Source · Self-Hosted · Multi-Channel</div>
+      <h1 class="hero-title">
+        Your AI,<br>
+        <span class="gradient-text">Living in Your Repo</span>
+      </h1>
+      <p class="hero-subtitle">
+        Fork. Add keys. Deploy. Your personal agent is alive.
+      </p>
+      <div class="hero-actions">
+        <a href="https://github.com/CedarBeach2019/personallog-ai/fork" class="btn btn-primary">
+          Fork on GitHub
+        </a>
+        <a href="/app" class="btn btn-secondary">
+          Try Live Demo
+        </a>
+      </div>
+      <div class="hero-stats">
+        <div class="stat">
+          <span class="stat-value">60s</span>
+          <span class="stat-label">to deploy</span>
+        </div>
+        <div class="stat">
+          <span class="stat-value">5+</span>
+          <span class="stat-label">channels</span>
+        </div>
+        <div class="stat">
+          <span class="stat-value">MIT</span>
+          <span class="stat-label">license</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section id="features" class="features">
+    <h2 class="section-title">Everything you need in a personal AI</h2>
+    <p class="section-subtitle">Built on cocapn — the paradigm where the repo IS the agent</p>
+
+    <div class="feature-grid">
+      <div class="feature-card fade-in">
+        <div class="feature-icon">🧠</div>
+        <h3>Persistent Memory</h3>
+        <p>Remembers every conversation, preference, and fact across sessions. KV-backed storage that grows with you.</p>
+      </div>
+
+      <div class="feature-card fade-in">
+        <div class="feature-icon">💬</div>
+        <h3>Multi-Channel</h3>
+        <p>Chat via web, Telegram, Discord, WhatsApp, or email. Your agent meets you where you are.</p>
+      </div>
+
+      <div class="feature-card fade-in">
+        <div class="feature-icon">🤝</div>
+        <h3>Agent-to-Agent</h3>
+        <p>Your agent can talk to other agents via the A2A protocol. Build a network of AI assistants.</p>
+      </div>
+
+      <div class="feature-card fade-in">
+        <div class="feature-icon">📁</div>
+        <h3>Repo-Aware</h3>
+        <p>Reads your files, understands your code, generates CLAUDE.md files. The agent IS the repo.</p>
+      </div>
+
+      <div class="feature-card fade-in">
+        <div class="feature-icon">🏠</div>
+        <h3>Self-Hosted</h3>
+        <p>Runs on Cloudflare Workers. Your data stays on your infrastructure. No third-party data harvesting.</p>
+      </div>
+
+      <div class="feature-card fade-in">
+        <div class="feature-icon">🔓</div>
+        <h3>Open Source</h3>
+        <p>MIT licensed. Fork it, modify it, make it yours. No vendor lock-in, no hidden costs.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Quick Start -->
+  <section id="quickstart" class="quickstart">
+    <h2 class="section-title">Get Started in 60 Seconds</h2>
+    <p class="section-subtitle">Three steps to your personal AI agent</p>
+
+    <div class="steps">
+      <div class="step fade-in">
+        <div class="step-number">1</div>
+        <div class="step-content">
+          <h3>Fork the Repo</h3>
+          <p>Click fork on GitHub. Clone your fork locally.</p>
+          <div class="code-block">
+            <code>git clone https://github.com/YOU/personallog-ai.git</code>
+          </div>
+        </div>
+      </div>
+
+      <div class="step fade-in">
+        <div class="step-number">2</div>
+        <div class="step-content">
+          <h3>Add Your Secrets</h3>
+          <p>Set your API key and a JWT secret for auth.</p>
+          <div class="code-block">
+            <code>npx wrangler secret put DEEPSEEK_API_KEY<br>npx wrangler secret put JWT_SECRET</code>
+          </div>
+        </div>
+      </div>
+
+      <div class="step fade-in">
+        <div class="step-number">3</div>
+        <div class="step-content">
+          <h3>Deploy</h3>
+          <p>One command. Your agent is live.</p>
+          <div class="code-block">
+            <code>npm run deploy</code>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Demo -->
+  <section class="demo">
+    <h2 class="section-title">See It In Action</h2>
+    <div class="demo-container fade-in">
+      <div class="demo-window">
+        <div class="demo-titlebar">
+          <span class="demo-dot" style="background:#ef4444"></span>
+          <span class="demo-dot" style="background:#f59e0b"></span>
+          <span class="demo-dot" style="background:#22c55e"></span>
+          <span class="demo-url">personallog.ai/app</span>
+        </div>
+        <div class="demo-chat">
+          <div class="demo-msg demo-msg-user">
+            <div class="demo-bubble">What do you know about me?</div>
+          </div>
+          <div class="demo-msg demo-msg-agent">
+            <div class="demo-avatar">✨</div>
+            <div class="demo-bubble">
+              Based on our conversations, I know you're a developer who loves clean architecture.
+              You prefer TypeScript, work with Cloudflare Workers, and your current project is cocapn.
+              You also mentioned you're learning guitar — how's that going? 🎸
+            </div>
+          </div>
+          <div class="demo-msg demo-msg-user">
+            <div class="demo-bubble">Can you summarize my repo structure?</div>
+          </div>
+          <div class="demo-msg demo-msg-agent">
+            <div class="demo-avatar">✨</div>
+            <div class="demo-bubble">
+              Your repo has 24 files across 6 directories. Main modules: worker (entry), agent (core),
+              channels (connectors), and cocapn (config). TypeScript throughout, strict mode enabled.
+              Want me to generate a CLAUDE.md for it?
+            </div>
+          </div>
+        </div>
+        <div class="demo-input">
+          <span class="demo-placeholder">Type a message...</span>
+          <span class="demo-send">➤</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="cta">
+    <h2 class="cta-title">Ready to meet your agent?</h2>
+    <p class="cta-subtitle">It takes 60 seconds. Seriously.</p>
+    <div class="cta-actions">
+      <a href="https://github.com/CedarBeach2019/personallog-ai/fork" class="btn btn-primary btn-large">
+        Fork on GitHub
+      </a>
+      <a href="/app" class="btn btn-secondary btn-large">
+        Try the Demo
+      </a>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="footer-content">
+      <div class="footer-brand">
+        <span>✨</span> personallog.ai
+      </div>
+      <div class="footer-links">
+        <a href="https://github.com/CedarBeach2019/personallog-ai">GitHub</a>
+        <a href="https://github.com/CedarBeach2019/personallog-ai/blob/main/LICENSE">MIT License</a>
+        <a href="https://github.com/CedarBeach2019/personallog-ai/issues">Issues</a>
+      </div>
+      <div class="footer-note">
+        Built on <a href="https://github.com/nichochar/cocapn" target="_blank">cocapn</a> — the repo IS the agent.
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // Intersection Observer for fade-in animations
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1 });
+
+    document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+
+    // Smooth scroll for anchor links
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+      anchor.addEventListener('click', (e) => {
+        e.preventDefault();
+        const target = document.querySelector(anchor.getAttribute('href'));
+        if (target) target.scrollIntoView({ behavior: 'smooth' });
+      });
+    });
+  </script>
+</body>
+</html>
