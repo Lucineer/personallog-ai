@@ -564,6 +564,8 @@ export default {
         const token = getTokenFromRequest(request);
         let user = 'guest';
         let guestLimitReached = false;
+        let guestUsed = 0;
+        let guestLimit = 0;
 
         if (token && env.JWT_SECRET) {
           const decoded = verifyToken(token, env.JWT_SECRET);
@@ -575,11 +577,13 @@ export default {
           const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
           const guestKey = `_guest:${ip}`;
           const guestCount = parseInt(await env.MEMORY.get(guestKey) || '0');
-          const limit = parseInt(env.GUEST_LIMIT || '5');
-          if (guestCount >= limit) {
+          guestLimit = parseInt(env.GUEST_LIMIT || '5');
+          guestUsed = guestCount;
+          if (guestCount >= guestLimit) {
             guestLimitReached = true;
           } else {
-            await env.MEMORY.put(guestKey, String(guestCount + 1));
+            guestUsed = guestCount + 1;
+            await env.MEMORY.put(guestKey, String(guestUsed));
           }
         }
 
@@ -587,7 +591,38 @@ export default {
           return ERRORS.GUEST_LIMIT(parseInt(env.GUEST_LIMIT || '5'));
         }
 
-        return await handleChat(request, env, user, 'web');
+        const chatResponse = await handleChat(request, env, user, 'web');
+
+        // Add guest usage header for the UI to read
+        if (user === 'guest') {
+          const headers = new Headers(chatResponse.headers);
+          headers.set('X-Guest-Used', String(guestUsed));
+          headers.set('X-Guest-Limit', String(guestLimit));
+          return new Response(chatResponse.body, {
+            status: chatResponse.status,
+            statusText: chatResponse.statusText,
+            headers,
+          });
+        }
+
+        return chatResponse;
+      }
+
+      // Demo status — returns guest usage for this IP
+      if (method === 'GET' && path === '/api/demo/status') {
+        const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+        const token = getTokenFromRequest(request);
+        const limit = parseInt(env.GUEST_LIMIT || '5');
+
+        if (token && env.JWT_SECRET) {
+          const decoded = verifyToken(token, env.JWT_SECRET);
+          if (decoded) {
+            return jsonResponse({ guest: false, used: 0, limit: 0 });
+          }
+        }
+
+        const used = parseInt(await env.MEMORY.get(`_guest:${ip}`) || '0');
+        return jsonResponse({ guest: true, used, limit });
       }
 
       // Files
