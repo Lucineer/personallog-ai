@@ -11,6 +11,7 @@ import { handleTelegram } from './channels/telegram.js';
 import { handleDiscord } from './channels/discord.js';
 import { handleWhatsApp } from './channels/whatsapp.js';
 import { LANDING_HTML } from './landing-html.js';
+import { APP_HTML } from './app-html.js';
 
 // ===== Types =====
 interface Env {
@@ -528,10 +529,12 @@ export default {
       }
 
       if (method === 'GET' && path === '/app') {
-        return new Response(
-          '<!DOCTYPE html><html><head><title>personallog.ai</title></head><body><h1>Loading...</h1><p>App served via Cloudflare Pages</p></body></html>',
-          { headers: { 'Content-Type': 'text/html', ...corsHeaders() } }
-        );
+        // Redirect to app.html served by Cloudflare Pages, or serve inline below
+        // The self-contained app HTML is in public/app.html
+        // For Workers-only deploy, we serve it inline
+        return new Response(APP_HTML, {
+          headers: { 'Content-Type': 'text/html; charset=utf-8', ...corsHeaders() },
+        });
       }
 
       // ===== API Routes =====

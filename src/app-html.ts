@@ -1,4 +1,7 @@
-<!DOCTYPE html>
+// App page HTML — self-contained with inline CSS & JS
+// Served by the worker for GET /app
+
+export const APP_HTML = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -310,7 +313,7 @@
       async function fetchDemoStatus() {
         try {
           const headers = {};
-          if (state.token) headers['Authorization'] = `Bearer ${state.token}`;
+          if (state.token) headers['Authorization'] = \`Bearer \${state.token}\`;
           const res = await fetch('/api/demo/status', { headers });
           if (res.ok) {
             const data = await res.json();
@@ -328,12 +331,12 @@
         }
         guestCounter.classList.remove('hidden');
         const remaining = state.guestLimit - state.guestUsed;
-        guestCounter.textContent = `${state.guestUsed}/${state.guestLimit} free messages used`;
+        guestCounter.textContent = \`\${state.guestUsed}/\${state.guestLimit} free messages used\`;
 
         guestCounter.classList.remove('limit-warning', 'limit-reached');
         if (remaining <= 0) {
           guestCounter.classList.add('limit-reached');
-          guestCounter.innerHTML = `${state.guestUsed}/${state.guestLimit} free messages used — <a href="https://github.com/Lucineer/personallog-ai/fork" target="_blank">Fork this repo for unlimited access</a>`;
+          guestCounter.innerHTML = \`\${state.guestUsed}/\${state.guestLimit} free messages used — <a href="https://github.com/Lucineer/personallog-ai/fork" target="_blank">Fork this repo for unlimited access</a>\`;
         } else if (remaining <= 2) {
           guestCounter.classList.add('limit-warning');
         }
@@ -343,7 +346,7 @@
         if (!text.trim() || state.streaming) return;
 
         if (!state.token && state.isGuest && state.guestUsed >= state.guestLimit) {
-          addMessage('agent', `You've used all ${state.guestLimit} free messages. **[Fork this repo](https://github.com/Lucineer/personallog-ai/fork)** for unlimited access!`, 'warning');
+          addMessage('agent', \`You've used all \${state.guestLimit} free messages. **[Fork this repo](https://github.com/Lucineer/personallog-ai/fork)** for unlimited access!\`, 'warning');
           return;
         }
 
@@ -354,7 +357,7 @@
 
         try {
           const headers = { 'Content-Type': 'application/json' };
-          if (state.token) headers['Authorization'] = `Bearer ${state.token}`;
+          if (state.token) headers['Authorization'] = \`Bearer \${state.token}\`;
 
           const res = await fetch('/api/chat', {
             method: 'POST',
@@ -372,7 +375,7 @@
           renderGuestCounter();
 
           if (!res.ok) {
-            let errorMsg = `Error ${res.status}`;
+            let errorMsg = \`Error \${res.status}\`;
             try {
               const errData = await res.json();
               errorMsg = errData.error || errorMsg;
@@ -393,7 +396,7 @@
           }
         } catch (err) {
           typingEl?.remove();
-          addMessage('agent', `Connection error: ${err.message}. Is the agent running?`, 'error');
+          addMessage('agent', \`Connection error: \${err.message}. Is the agent running?\`, 'error');
         } finally {
           state.streaming = false;
           sendBtn.disabled = false;
@@ -414,7 +417,7 @@
           if (done) break;
 
           const chunk = decoder.decode(value, { stream: true });
-          const lines = chunk.split('\n');
+          const lines = chunk.split('\\n');
 
           for (const line of lines) {
             if (line.startsWith('data: ')) {
@@ -442,11 +445,11 @@
 
       function addMessage(role, text, type) {
         const div = document.createElement('div');
-        div.className = `message ${role}${type ? ' ' + type : ''}`;
-        div.innerHTML = `
-          <div class="message-avatar">${role === 'user' ? '👤' : state.status.avatar}</div>
-          <div class="message-bubble">${text ? renderMarkdown(text) : ''}</div>
-        `;
+        div.className = \`message \${role}\${type ? ' ' + type : ''}\`;
+        div.innerHTML = \`
+          <div class="message-avatar">\${role === 'user' ? '👤' : state.status.avatar}</div>
+          <div class="message-bubble">\${text ? renderMarkdown(text) : ''}</div>
+        \`;
         messagesEl.appendChild(div);
         messagesEl.scrollTop = messagesEl.scrollHeight;
         return div;
@@ -456,12 +459,12 @@
         const div = document.createElement('div');
         div.className = 'message agent';
         div.id = 'typing';
-        div.innerHTML = `
-          <div class="message-avatar">${state.status.avatar}</div>
+        div.innerHTML = \`
+          <div class="message-avatar">\${state.status.avatar}</div>
           <div class="message-bubble">
             <div class="typing-indicator"><span></span><span></span><span></span></div>
           </div>
-        `;
+        \`;
         messagesEl.appendChild(div);
         messagesEl.scrollTop = messagesEl.scrollHeight;
         return div;
@@ -472,17 +475,17 @@
           .replace(/&/g, '&amp;')
           .replace(/</g, '&lt;')
           .replace(/>/g, '&gt;')
-          .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>')
-          .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
-          .replace(/`([^`]+)`/g, '<code>$1</code>')
-          .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-          .replace(/\*(.+?)\*/g, '<em>$1</em>')
-          .replace(/\n/g, '<br>');
+          .replace(/\\[([^\\]]+)\\]\\(([^)]+)\\)/g, '<a href="\$2" target="_blank">\$1</a>')
+          .replace(/\`\`\`(\w*)\\n([\\s\\S]*?)\`\`\`/g, '<pre><code>\$2</code></pre>')
+          .replace(/\`([^\`]+)\`/g, '<code>\$1</code>')
+          .replace(/\\*\\*(.+?)\\*\\*/g, '<strong>\$1</strong>')
+          .replace(/\\*(.+?)\\*/g, '<em>\$1</em>')
+          .replace(/\\n/g, '<br>');
       }
 
       function renderStatus() {
         const { name, avatar, files, memories } = state.status;
-        statusInfo.textContent = `${avatar} ${name} · ${files} files · ${memories} memories`;
+        statusInfo.textContent = \`\${avatar} \${name} · \${files} files · \${memories} memories\`;
       }
 
       function renderChatList() {
@@ -490,10 +493,10 @@
         for (const convo of state.conversations) {
           const li = document.createElement('li');
           li.className = 'sidebar-item' + (convo.id === state.currentConvo ? ' active' : '');
-          li.innerHTML = `
-            <div class="sidebar-item-title">${escapeHtml(convo.title)}</div>
-            <div class="sidebar-item-preview">${escapeHtml(convo.preview)}</div>
-          `;
+          li.innerHTML = \`
+            <div class="sidebar-item-title">\${escapeHtml(convo.title)}</div>
+            <div class="sidebar-item-preview">\${escapeHtml(convo.preview)}</div>
+          \`;
           li.addEventListener('click', () => loadConversation(convo.id));
           chatList.appendChild(li);
         }
@@ -505,7 +508,7 @@
           const li = document.createElement('li');
           li.className = 'file-tree-item';
           const icon = file.type === 'dir' ? '📁' : file.path.endsWith('.ts') ? '📘' : file.path.endsWith('.md') ? '📝' : file.path.endsWith('.json') ? '📋' : '📄';
-          li.innerHTML = `${icon} ${escapeHtml(file.path)}`;
+          li.innerHTML = \`\${icon} \${escapeHtml(file.path)}\`;
           li.addEventListener('click', () => openFile(file.path));
           fileTree.appendChild(li);
         }
@@ -513,7 +516,7 @@
 
       async function openFile(path) {
         try {
-          const res = await fetch(`/api/files/${encodeURIComponent(path)}`);
+          const res = await fetch(\`/api/files/\${encodeURIComponent(path)}\`);
           if (!res.ok) throw new Error('File not found');
           const content = await res.text();
 
@@ -529,12 +532,12 @@
         } catch (err) {
           fileViewerEmpty.style.display = 'block';
           fileViewer.style.display = 'none';
-          fileViewerEmpty.textContent = `Error: ${err.message}`;
+          fileViewerEmpty.textContent = \`Error: \${err.message}\`;
         }
       }
 
       function addWelcomeMessage() {
-        addMessage('agent', `Hey! I'm ${state.status.name} ${state.status.avatar}\n\nI'm your personal AI agent, living in this repo. I remember our conversations, understand your files, and I'm available on multiple channels.\n\nWhat would you like to talk about?`);
+        addMessage('agent', \`Hey! I'm \${state.status.name} \${state.status.avatar}\\n\\nI'm your personal AI agent, living in this repo. I remember our conversations, understand your files, and I'm available on multiple channels.\\n\\nWhat would you like to talk about?\`);
       }
 
       function saveToConversation(response) {
@@ -633,4 +636,4 @@
     })();
   </script>
 </body>
-</html>
+</html>`;
