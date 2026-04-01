@@ -1,313 +1,85 @@
-# personallog.ai
+# PersonalLog — Your Personal AI That Remembers Everything
 
-**Your AI, Living in Your Repo**
+> *The simplest cocapn vessel. Fork it, add your API key, deploy. It works.*
 
-Fork. Add keys. Deploy. Your personal agent is alive.
+## What It Is
 
-personallog.ai is a personal AI agent that lives in your Git repository. It remembers your conversations, understands your code, and connects to your favorite messaging apps. Built on [cocapn](https://github.com/nichochar/cocapn) — the paradigm where the repo IS the agent.
+PersonalLog is a personal AI companion that lives in your repo. It remembers every conversation, every preference, every context. It's not a chatbot that forgets you between sessions — it's an AI that grows with you.
 
----
+## Why It's Different
+
+Every AI chatbot starts fresh. PersonalLog starts where you left off. After a week, it knows your routines. After a month, it anticipates your needs. After a year, it's irreplaceable.
+
+This is possible because **the repo IS the agent**. Every conversation, every preference, every piece of context lives in your repo. You own it. You control it. No corporation can take it away.
 
 ## Features
 
-- **Persistent Memory** — Remembers everything across sessions via KV-backed storage
-- **Multi-Channel** — Chat via web, Telegram, Discord, WhatsApp, or email
-- **Agent-to-Agent** — Talk to other personallog.ai agents via the A2A protocol
-- **Repo-Aware** — Reads and understands your files, code, and documentation
-- **Self-Hosted** — Runs on Cloudflare Workers. Your data, your infrastructure
-- **Open Source** — MIT licensed. Fork it, modify it, make it yours
-- **Soul-Driven** — Personality defined in `cocapn/soul.md`. Edit the file, change who the agent is
-- **Streaming** — Real-time SSE streaming responses for the web app
-- **Guest Mode** — Share your agent with anyone (5 free messages, configurable)
-
----
+- 💬 **Persistent chat** — remembers every conversation
+- 🧠 **Smart context** — prioritizes recent > relevant > old (~4K tokens)
+- 🔒 **Private by default** — your data, your repo, your control
+- 🌐 **Deploy anywhere** — Cloudflare Workers (free), Docker, local
+- 🔑 **BYOK** — bring any LLM key (DeepSeek, Claude, GPT, Ollama)
+- 📱 **Mobile-ready** — works on phone, tablet, desktop
+- 🎨 **Clean UI** — simple, fast, no bloat
 
 ## Quick Start
 
-### 1. Fork & Clone
-
 ```bash
+# 1. Fork on GitHub
+# 2. Clone your fork
 git clone https://github.com/YOUR_USERNAME/personallog-ai.git
 cd personallog-ai
+
+# 3. Install
 npm install
+
+# 4. Run locally (free)
+DEEPSEEK_API_KEY=your-key npx wrangler dev
+
+# 5. Open http://localhost:8787
 ```
 
-### 2. Add Secrets
+## Deploy to Cloudflare (free tier)
 
 ```bash
+# Set your API key
 npx wrangler secret put DEEPSEEK_API_KEY
-npx wrangler secret put JWT_SECRET
+
+# Deploy
+npx wrangler deploy
+
+# Your AI is live at your-subdomain.workers.dev
 ```
 
-### 3. Deploy
+## Deploy with Custom Domain
 
 ```bash
-npm run deploy
+# In Cloudflare dashboard, add custom domain to your Worker
+# Point your DNS: personallog.yourdomain.com → your Worker
 ```
 
-Your agent is live at `https://personallog-ai.YOUR_WORKERS_SUBDOMAIN.workers.dev`
+## The Two-Repo Model
 
----
+PersonalLog works best with two repos:
+1. **Public repo** (this one) — the face, the UI, the public personality
+2. **Private repo** — the brain, the memories, the secrets
 
-## Channel Setup
+The public repo has no secrets. The private repo has everything. The cocapn gateway ensures secrets never leak.
 
-### Telegram
+## Build Status
 
-1. Message [@BotFather](https://t.me/BotFather) to create a bot
-2. Get your bot token and set it as a secret:
-   ```bash
-   npx wrangler secret put TELEGRAM_BOT_TOKEN
-   ```
-3. Set your webhook:
-   ```bash
-   curl -X POST "https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://YOUR_DOMAIN/api/webhook/telegram"
-   ```
+✅ Working — boots locally and on Cloudflare Workers
+✅ SSE streaming chat with DeepSeek
+✅ Session management
+✅ Dark theme UI
+✅ Mobile responsive
+✅ Guest mode (5 free messages)
+📝 Roadmap: BYOK provider switching, Docker support, A2A bridge
 
-### Discord
+## Philosophy
 
-1. Create a bot at the [Discord Developer Portal](https://discord.com/developers/applications)
-2. Enable the Message Content Intent
-3. Set the webhook URL in your bot's settings:
-   ```
-   https://YOUR_DOMAIN/api/webhook/discord
-   ```
-4. Set secrets:
-   ```bash
-   npx wrangler secret put DISCORD_BOT_TOKEN
-   npx wrangler secret put DISCORD_PUBLIC_KEY
-   ```
+Less is more. PersonalLog does one thing well: it remembers you. No features you'll never use. No bloat. Just a clean, fast AI that grows with you.
 
-### WhatsApp (Meta Business)
+The most important product is the simplest one that works.
 
-1. Set up a [Meta Business app](https://business.facebook.com/)
-2. Configure WhatsApp Business settings
-3. Set secrets:
-   ```bash
-   npx wrangler secret put WHATSAPP_VERIFY_TOKEN
-   npx wrangler secret put WHATSAPP_ACCESS_TOKEN
-   ```
-4. Set webhook URL: `https://YOUR_DOMAIN/api/webhook/whatsapp`
-
-### Email (Cloudflare Email Workers)
-
-Add to your `wrangler.toml`:
-
-```toml
-[[send_email]]
-name = "INBOUND_EMAIL"
-```
-
-Send emails to `agent@YOUR_DOMAIN` and the agent will respond.
-
----
-
-## Deployment Options
-
-### Cloudflare Workers (Recommended)
-
-```bash
-npm run deploy
-```
-
-### Docker
-
-```bash
-docker build -t personallog-ai .
-docker run -p 8787:8787 \
-  -e DEEPSEEK_API_KEY=your_key \
-  -e JWT_SECRET=your_secret \
-  personallog-ai
-```
-
-### Local Development
-
-```bash
-npm run dev
-# Opens at http://localhost:8787
-```
-
----
-
-## API Reference
-
-### Chat
-
-```
-POST /api/chat
-Authorization: Bearer <token>  (optional — guest mode without token)
-Content-Type: application/json
-
-{
-  "message": "Hello, who are you?",
-  "stream": true
-}
-```
-
-Response: SSE stream of JSON chunks, or a single JSON response.
-
-### Status
-
-```
-GET /api/status
-```
-
-```json
-{
-  "name": "PersonalAgent",
-  "avatar": "✨",
-  "files": 42,
-  "memories": 10,
-  "uptime": 3600,
-  "channels": ["web", "telegram"]
-}
-```
-
-### Files
-
-```
-GET /api/files          → List all repo files
-GET /api/files/:path    → Read file content
-```
-
-### Memory
-
-```
-GET /api/memory         → List stored memories
-DELETE /api/memory/:id  → Forget a memory
-```
-
-### Webhooks
-
-```
-POST /api/webhook/telegram
-POST /api/webhook/discord
-POST /api/webhook/whatsapp
-```
-
-### Agent-to-Agent
-
-```
-POST /api/a2a/discover   → Introduce your agent
-POST /api/a2a/message    → Send a message to this agent
-GET  /api/a2a/peers      → List known peer agents
-```
-
-### Analytics
-
-```
-GET /api/analytics
-```
-
-```json
-{
-  "totalMessages": 1234,
-  "totalUsers": 5,
-  "channels": { "web": 800, "telegram": 300, "discord": 134 },
-  "avgResponseMs": 850
-}
-```
-
----
-
-## A2A Protocol
-
-Agents can talk to each other using a shared protocol:
-
-1. **Discovery** — `POST /api/a2a/discover` with your agent's info
-2. **Handshake** — Agents exchange capabilities and shared secret
-3. **Messaging** — Send messages via `POST /api/a2a/message`
-
-```typescript
-// Discover another agent
-await fetch('https://other-agent.workers.dev/api/a2a/discover', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    name: 'MyAgent',
-    url: 'https://my-agent.workers.dev',
-    capabilities: ['chat', 'memory', 'files']
-  })
-});
-```
-
----
-
-## Configuration
-
-### cocapn/cocapn.json
-
-```json
-{
-  "name": "PersonalAgent",
-  "provider": "deepseek",
-  "model": "deepseek-chat",
-  "maxMemories": 1000,
-  "guestLimit": 5,
-  "channels": {
-    "telegram": true,
-    "discord": true,
-    "whatsapp": false,
-    "email": false
-  }
-}
-```
-
-### cocapn/soul.md
-
-Edit this file to change your agent's personality:
-
-```markdown
----
-name: PersonalAgent
-tone: warm, helpful, thoughtful
-avatar: ✨
----
-
-# I Am Your Personal Agent
-
-I live in your repo. I remember everything.
-```
-
----
-
-## Architecture
-
-personallog.ai is a [cocapn](https://github.com/nichochar/cocapn) vertical — a powered repo built on the cocapn seed engine.
-
-```
-Cloudflare Worker (src/worker.ts)
-  ├── Routes (HTTP → handlers)
-  ├── Agent Core (src/agent/)
-  │   ├── soul.ts       → Personality from soul.md
-  │   ├── memory.ts     → KV-backed persistence
-  │   ├── context.ts    → Smart context building
-  │   ├── intelligence.ts → Code understanding
-  │   └── a2a.ts        → Agent-to-agent protocol
-  ├── Channels (src/channels/)
-  │   ├── telegram.ts   → Telegram Bot API
-  │   ├── discord.ts    → Discord webhooks
-  │   ├── whatsapp.ts   → Meta Graph API
-  │   └── normalize.ts  → Message normalization
-  └── Static (public/)
-      ├── index.html    → Landing page
-      ├── app.html      → Messenger-style web app
-      └── css/, js/     → Styles and logic
-```
-
----
-
-## Contributing
-
-1. Fork the repo
-2. Create a feature branch: `git checkout -b feature/my-feature`
-3. Commit: `git commit -m 'feat: my feature'`
-4. Push: `git push origin feature/my-feature`
-5. Open a Pull Request
-
-All commits by agentic workers use `Author: Superinstance`.
-
----
-
-## License
-
-MIT — see [LICENSE](./LICENSE)
+Author: Superinstance
