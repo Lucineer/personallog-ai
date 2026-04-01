@@ -1,3 +1,31 @@
+/*
+ * THE FRONTEND UNIVERSE MANIFESTO
+ *
+ * Systems will become pure frontends. The UI is everything.
+ *
+ * Behind the UI, agents handle databases, APIs, hardware.
+ * The human sees intention → result. The agents handle the wiring.
+ * It doesn't matter how the backend works from a human perspective.
+ *
+ * The tripartite spheres negotiate the best way to execute:
+ * - Pathos: what the human wants to see/feel
+ * - Logos: what makes logical sense given constraints
+ * - Ethos: what the hardware can actually do
+ *
+ * Synergistically. Over time. Each sphere learns from the others.
+ * The UI gets better because Logos remembers what worked.
+ * The backend gets smarter because Ethos reports what's fast.
+ * The human gets happier because Pathos understands preferences.
+ *
+ * Programming languages are an intermediate step that will dissolve.
+ * NLP → A2A-native → bytecode. Humans express intention.
+ * Agents translate. The hardware executes. No code in between.
+ *
+ * If you're reading this, you already know that the future
+ * isn't about writing code. It's about writing intentions.
+ * Welcome to the repo that proves it.
+ */
+
 // personallog.ai — Cloudflare Worker
 // The repo IS the agent. Routes, auth, streaming, file serving.
 
@@ -10,6 +38,8 @@ import { normalizeMessage } from './channels/normalize.js';
 import { handleTelegram } from './channels/telegram.js';
 import { handleDiscord } from './channels/discord.js';
 import { handleWhatsApp } from './channels/whatsapp.js';
+import { Proactive } from './intelligence/proactive.js';
+import { KnowledgeGraph } from './memory/knowledge-graph.js';
 import { LANDING_HTML } from './landing-html.js';
 import { APP_HTML } from './app-html.js';
 
@@ -72,7 +102,7 @@ function getTokenFromRequest(request: Request): string | null {
 function corsHeaders(): Record<string, string> {
   return {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   };
 }
@@ -86,6 +116,88 @@ function jsonResponse(data: unknown, status = 200, headers: Record<string, strin
       ...headers,
     },
   });
+}
+
+// ===== Personality Persistence =====
+interface Personality {
+  communicationStyle: 'concise' | 'detailed' | 'technical' | 'casual';
+  prefersAnalogies: boolean;
+  primaryLanguage: string;
+  topics: string[];
+  questionFrequency: number; // rolling avg questions per message
+  avgMessageLength: number;
+  tonePreference: 'formal' | 'friendly' | 'technical';
+  updatedAt: number;
+}
+
+const DEFAULT_PERSONALITY: Personality = {
+  communicationStyle: 'concise',
+  prefersAnalogies: false,
+  primaryLanguage: 'en',
+  topics: [],
+  questionFrequency: 0,
+  avgMessageLength: 0,
+  tonePreference: 'friendly',
+  updatedAt: 0,
+};
+
+async function getPersonality(kv: KVNamespace, user: string): Promise<Personality> {
+  const raw = await kv.get(`user/${user}/personality.json`, 'json');
+  return raw ? raw as Personality : { ...DEFAULT_PERSONALITY };
+}
+
+async function updatePersonality(kv: KVNamespace, user: string, message: string): Promise<Personality> {
+  const personality = await getPersonality(kv, user);
+
+  // Learn from message patterns
+  const words = message.split(/\s+/);
+  const questions = (message.match(/\?/g) || []).length;
+  const hasCode = /```|`[^`]+`|def |class |function |import |const |let |var /i.test(message);
+
+  // Update rolling averages
+  const totalMessages = Math.max(1, Math.round(personality.avgMessageLength > 0 ? personality.updatedAt : 1));
+  personality.avgMessageLength = (
+    (personality.avgMessageLength * (totalMessages - 1) + words.length) / totalMessages
+  );
+  personality.questionFrequency = (
+    (personality.questionFrequency * (totalMessages - 1) + questions) / totalMessages
+  );
+
+  // Detect communication style
+  if (words.length < 15) personality.communicationStyle = 'concise';
+  else if (words.length > 50) personality.communicationStyle = 'detailed';
+  if (hasCode) personality.communicationStyle = 'technical';
+
+  // Detect topic interests
+  const techTerms = message.match(/\b(rust|python|typescript|react|docker|kubernetes|machine learning|ai|web3|blockchain|devops|cloud|api|database|frontend|backend|mobile)\b/gi);
+  if (techTerms) {
+    for (const term of new Set(techTerms.map(t => t.toLowerCase()))) {
+      if (!personality.topics.includes(term)) {
+        personality.topics.push(term);
+        if (personality.topics.length > 20) personality.topics.shift();
+      }
+    }
+  }
+
+  // Detect analogy preference
+  if (/\b(like|as if|similar to|kind of like|imagine|think of it as)\b/i.test(message)) {
+    personality.prefersAnalogies = true;
+  }
+
+  personality.updatedAt = Date.now();
+  await kv.put(`user/${user}/personality.json`, JSON.stringify(personality));
+  return personality;
+}
+
+function personalityToPromptContext(personality: Personality): string {
+  const parts: string[] = [];
+  if (personality.communicationStyle === 'concise') parts.push('User prefers concise, to-the-point answers.');
+  if (personality.communicationStyle === 'detailed') parts.push('User appreciates thorough, detailed explanations.');
+  if (personality.communicationStyle === 'technical') parts.push('User is technical — use precise terminology and code where appropriate.');
+  if (personality.prefersAnalogies) parts.push('User responds well to analogies — use them to explain concepts.');
+  if (personality.topics.length > 0) parts.push(`User's known interests: ${personality.topics.join(', ')}.`);
+  if (personality.questionFrequency > 1) parts.push('User asks many questions — be patient and educational.');
+  return parts.length > 0 ? parts.join(' ') : '';
 }
 
 // ===== Structured Error Responses =====
@@ -365,11 +477,22 @@ async function handleChat(
   const soul = await loadSoul(env.MEMORY);
   const memory = new Memory(env.MEMORY);
   const intelligence = new Intelligence(env.MEMORY);
+  const proactive = new Proactive(env.MEMORY);
+  const knowledgeGraph = new KnowledgeGraph(env.MEMORY);
+
+  // Learn personality from user message
+  const personality = await updatePersonality(env.MEMORY, user, userMessage);
+  const personalityContext = personalityToPromptContext(personality);
 
   // Build conversation context
   const history = await memory.getHistory(user);
   const context = await buildContext(env.MEMORY, soul, history, userMessage);
-  const systemPrompt = buildFullSystemPrompt(soul, context);
+  let systemPrompt = buildFullSystemPrompt(soul, context);
+
+  // Inject personality into system prompt
+  if (personalityContext) {
+    systemPrompt += `\n\n[User Profile] ${personalityContext}`;
+  }
 
   // Cap history to prevent context overflow
   const maxHistory = 20;
@@ -436,6 +559,7 @@ async function handleChat(
         const elapsed = Date.now() - startTime;
         await memory.addMessage(user, 'assistant', fullResponse, channel);
         await memory.extractAndStore(userMessage, fullResponse);
+        await knowledgeGraph.ingestConversation(user, userMessage, fullResponse);
 
         await recordAnalytics(env, {
           timestamp: Date.now(),
@@ -464,6 +588,7 @@ async function handleChat(
 
       await memory.addMessage(user, 'assistant', response, channel);
       await memory.extractAndStore(userMessage, response);
+      await knowledgeGraph.ingestConversation(user, userMessage, response);
 
       await recordAnalytics(env, {
         timestamp: Date.now(),
@@ -715,6 +840,264 @@ export default {
       if (method === 'GET' && path === '/api/analytics') {
         const analytics = await getAnalytics(env);
         return jsonResponse(analytics);
+      }
+
+      // ===== Personality =====
+      if (method === 'GET' && path === '/api/personality') {
+        const token = getTokenFromRequest(request);
+        if (!token || !env.JWT_SECRET) return ERRORS.UNAUTHORIZED();
+        const decoded = verifyToken(token, env.JWT_SECRET);
+        if (!decoded) return ERRORS.UNAUTHORIZED();
+        const personality = await getPersonality(env.MEMORY, decoded.user);
+        return jsonResponse({ personality });
+      }
+
+      // ===== Proactive Intelligence =====
+      if (method === 'GET' && path === '/api/proactive/suggestions') {
+        const token = getTokenFromRequest(request);
+        if (!token || !env.JWT_SECRET) return ERRORS.UNAUTHORIZED();
+        const decoded = verifyToken(token, env.JWT_SECRET);
+        if (!decoded) return ERRORS.UNAUTHORIZED();
+        const proactive = new Proactive(env.MEMORY);
+        const suggestions = await proactive.getSuggestions(decoded.user);
+        return jsonResponse({ suggestions });
+      }
+
+      if (method === 'GET' && path === '/api/proactive/config') {
+        const token = getTokenFromRequest(request);
+        if (!token || !env.JWT_SECRET) return ERRORS.UNAUTHORIZED();
+        const decoded = verifyToken(token, env.JWT_SECRET);
+        if (!decoded) return ERRORS.UNAUTHORIZED();
+        const proactive = new Proactive(env.MEMORY);
+        const config = await proactive.getConfig(decoded.user);
+        return jsonResponse({ config });
+      }
+
+      if (method === 'POST' && path === '/api/proactive/config') {
+        const token = getTokenFromRequest(request);
+        if (!token || !env.JWT_SECRET) return ERRORS.UNAUTHORIZED();
+        const decoded = verifyToken(token, env.JWT_SECRET);
+        if (!decoded) return ERRORS.UNAUTHORIZED();
+        const proactive = new Proactive(env.MEMORY);
+        let body: Record<string, unknown>;
+        try { body = await request.json() as Record<string, unknown>; } catch { return ERRORS.INVALID_BODY({ enabled: true }); }
+        const config = await proactive.setConfig(decoded.user, body as any);
+        return jsonResponse({ config });
+      }
+
+      // ===== Knowledge Graph =====
+      if (method === 'GET' && path === '/api/knowledge-graph') {
+        const token = getTokenFromRequest(request);
+        if (!token || !env.JWT_SECRET) return ERRORS.UNAUTHORIZED();
+        const decoded = verifyToken(token, env.JWT_SECRET);
+        if (!decoded) return ERRORS.UNAUTHORIZED();
+        const kg = new KnowledgeGraph(env.MEMORY);
+        const graph = await kg.getFullGraph(decoded.user);
+        return jsonResponse({ graph });
+      }
+
+      if (method === 'GET' && path === '/api/knowledge-graph/visualize') {
+        const token = getTokenFromRequest(request);
+        if (!token || !env.JWT_SECRET) return ERRORS.UNAUTHORIZED();
+        const decoded = verifyToken(token, env.JWT_SECRET);
+        if (!decoded) return ERRORS.UNAUTHORIZED();
+        const kg = new KnowledgeGraph(env.MEMORY);
+        const visualization = await kg.visualize(decoded.user);
+        return new Response(visualization, {
+          headers: { 'Content-Type': 'text/plain; charset=utf-8', ...corsHeaders() },
+        });
+      }
+
+      if (method === 'GET' && path.startsWith('/api/knowledge-graph/query/')) {
+        const token = getTokenFromRequest(request);
+        if (!token || !env.JWT_SECRET) return ERRORS.UNAUTHORIZED();
+        const decoded = verifyToken(token, env.JWT_SECRET);
+        if (!decoded) return ERRORS.UNAUTHORIZED();
+        const kg = new KnowledgeGraph(env.MEMORY);
+        const entityName = decodeURIComponent(path.slice('/api/knowledge-graph/query/'.length));
+        const result = await kg.query(decoded.user, entityName);
+        return jsonResponse(result);
+      }
+
+      // ===== Export =====
+      if (method === 'GET' && path === '/api/export/all') {
+        const token = getTokenFromRequest(request);
+        if (!token || !env.JWT_SECRET) return ERRORS.UNAUTHORIZED();
+        const decoded = verifyToken(token, env.JWT_SECRET);
+        if (!decoded) return ERRORS.UNAUTHORIZED();
+        const user = decoded.user;
+        const memory = new Memory(env.MEMORY);
+        const kg = new KnowledgeGraph(env.MEMORY);
+        const proactive = new Proactive(env.MEMORY);
+
+        const [facts, history, personality, graph, topics, config] = await Promise.all([
+          memory.getAllFacts(),
+          memory.getHistory(user),
+          getPersonality(env.MEMORY, user),
+          kg.getFullGraph(user),
+          proactive.getTopics(user),
+          proactive.getConfig(user),
+        ]);
+
+        return jsonResponse({
+          exportedAt: new Date().toISOString(),
+          user,
+          facts,
+          history,
+          personality,
+          knowledgeGraph: graph,
+          topics,
+          proactiveConfig: config,
+        });
+      }
+
+      if (method === 'GET' && path === '/api/export/markdown') {
+        const token = getTokenFromRequest(request);
+        if (!token || !env.JWT_SECRET) return ERRORS.UNAUTHORIZED();
+        const decoded = verifyToken(token, env.JWT_SECRET);
+        if (!decoded) return ERRORS.UNAUTHORIZED();
+        const user = decoded.user;
+        const memory = new Memory(env.MEMORY);
+        const kg = new KnowledgeGraph(env.MEMORY);
+
+        const [facts, history, graph] = await Promise.all([
+          memory.getAllFacts(),
+          memory.getHistory(user),
+          kg.getFullGraph(user),
+        ]);
+
+        let md = `# personallog.ai — Data Export\n\nExported: ${new Date().toISOString()}\nUser: ${user}\n\n`;
+        md += `## Memory Facts\n\n`;
+        for (const [key, value] of Object.entries(facts)) {
+          md += `- **${key}**: ${value}\n`;
+        }
+        md += `\n## Conversation History\n\n`;
+        for (const msg of history) {
+          const role = msg.role === 'user' ? '👤 You' : '✨ Agent';
+          const ts = msg.timestamp ? new Date(msg.timestamp).toISOString() : '';
+          md += `### ${role} ${ts ? `(${ts})` : ''}\n\n${msg.content}\n\n`;
+        }
+        if (graph.entities.length > 0) {
+          md += `## Knowledge Graph\n\n`;
+          const viz = await kg.visualize(user);
+          md += `\`\`\`\n${viz}\n\`\`\`\n`;
+        }
+
+        return new Response(md, {
+          headers: {
+            'Content-Type': 'text/markdown; charset=utf-8',
+            'Content-Disposition': 'attachment; filename="personallog-export.md"',
+            ...corsHeaders(),
+          },
+        });
+      }
+
+      // ===== Import =====
+      if (method === 'POST' && path === '/api/import') {
+        const token = getTokenFromRequest(request);
+        if (!token || !env.JWT_SECRET) return ERRORS.UNAUTHORIZED();
+        const decoded = verifyToken(token, env.JWT_SECRET);
+        if (!decoded) return ERRORS.UNAUTHORIZED();
+        const user = decoded.user;
+
+        let body: { format?: string; data?: any };
+        try { body = await request.json() as { format?: string; data?: any }; } catch { return ERRORS.INVALID_BODY({ format: 'json', data: {} }); }
+
+        if (!body.data) return ERRORS.INVALID_BODY({ format: 'json', data: { facts: {} } });
+
+        const memory = new Memory(env.MEMORY);
+        let imported = { facts: 0, history: 0, entities: 0, relations: 0 };
+
+        // Import facts
+        if (body.data.facts && typeof body.data.facts === 'object') {
+          for (const [key, value] of Object.entries(body.data.facts)) {
+            await memory.setFact(key, String(value), 'import');
+            imported.facts++;
+          }
+        }
+
+        // Import history
+        if (Array.isArray(body.data.history)) {
+          for (const msg of body.data.history) {
+            if (msg.role && msg.content) {
+              await memory.addMessage(user, msg.role, msg.content, msg.channel || 'import');
+              imported.history++;
+            }
+          }
+        }
+
+        // Import knowledge graph
+        if (body.data.knowledgeGraph) {
+          const kg = new KnowledgeGraph(env.MEMORY);
+          const graph = body.data.knowledgeGraph;
+          if (Array.isArray(graph.entities)) {
+            for (const entity of graph.entities) {
+              await kg.addEntity(user, entity.name, entity.type || 'other', entity.properties);
+              imported.entities++;
+            }
+          }
+          if (Array.isArray(graph.relations)) {
+            for (const rel of graph.relations) {
+              const fromEntity = graph.entities?.find((e: any) => e.id === rel.from);
+              const toEntity = graph.entities?.find((e: any) => e.id === rel.to);
+              if (fromEntity && toEntity) {
+                await kg.addRelation(user, fromEntity.name, toEntity.name, rel.type || 'related_to');
+                imported.relations++;
+              }
+            }
+          }
+        }
+
+        // Import personality
+        if (body.data.personality) {
+          await env.MEMORY.put(`user/${user}/personality.json`, JSON.stringify(body.data.personality));
+        }
+
+        return jsonResponse({ ok: true, imported });
+      }
+
+      // ===== Account Deletion =====
+      if (method === 'POST' && path === '/api/account/delete') {
+        const token = getTokenFromRequest(request);
+        if (!token || !env.JWT_SECRET) return ERRORS.UNAUTHORIZED();
+        const decoded = verifyToken(token, env.JWT_SECRET);
+        if (!decoded) return ERRORS.UNAUTHORIZED();
+        const user = decoded.user;
+
+        // Delete all user data
+        const keysToDelete: string[] = [];
+
+        // List all user-scoped keys
+        const prefixes = [
+          `user/${user}/`,
+          `history:${user}`,
+          `fact:`,
+        ];
+
+        for (const prefix of prefixes) {
+          const list = await env.MEMORY.list({ prefix });
+          for (const key of list.keys) {
+            keysToDelete.push(key.name);
+          }
+        }
+
+        // Delete guest tracking if applicable
+        const guestKey = `_guest:${user}`;
+        keysToDelete.push(guestKey);
+
+        for (const key of keysToDelete) {
+          await env.MEMORY.delete(key);
+        }
+
+        // Delete knowledge graph
+        const kg = new KnowledgeGraph(env.MEMORY);
+        await kg.deleteUserGraph(user);
+
+        return jsonResponse({
+          ok: true,
+          message: 'All data deleted successfully.',
+          deletedKeys: keysToDelete.length,
+        });
       }
 
       // 404
