@@ -10,6 +10,7 @@ import { normalizeMessage } from './channels/normalize.js';
 import { handleTelegram } from './channels/telegram.js';
 import { handleDiscord } from './channels/discord.js';
 import { handleWhatsApp } from './channels/whatsapp.js';
+import { LANDING_HTML } from './landing-html.js';
 
 // ===== Types =====
 interface Env {
@@ -39,16 +40,6 @@ interface AnalyticsEntry {
   tokensIn: number;
   tokensOut: number;
   responseMs: number;
-}
-
-// ===== Static Assets =====
-// In production, these would be imported via wrangler's static assets
-// or bundled. For this MVP, we fetch from a known path pattern.
-const STATIC_FILES: Record<string, { content: string; type: string }> = {};
-
-async function loadStaticAssets(env: Env): Promise<void> {
-  // Static files are served from KV or bundled
-  // For MVP, we embed them at deploy time
 }
 
 // ===== Auth =====
@@ -96,6 +87,52 @@ function jsonResponse(data: unknown, status = 200, headers: Record<string, strin
   });
 }
 
+// ===== Structured Error Responses =====
+interface ApiError {
+  error: string;
+  code: string;
+  retryable: boolean;
+  details?: unknown;
+}
+
+function errorResponse(error: string, code: string, status: number, retryable = false, details?: unknown): Response {
+  const body: ApiError = { error, code, retryable };
+  if (details) body.details = details;
+  return jsonResponse(body, status);
+}
+
+const ERRORS = {
+  BAD_REQUEST: (msg: string) => errorResponse(msg, 'BAD_REQUEST', 400),
+  UNAUTHORIZED: (msg = 'Authentication required. Provide a Bearer token or use guest mode.') =>
+    errorResponse(msg, 'UNAUTHORIZED', 401),
+  GUEST_LIMIT: (limit: number) =>
+    errorResponse(
+      `Guest limit reached (${limit} messages). Sign up for unlimited access — fork this repo!`,
+      'GUEST_LIMIT',
+      429,
+      false,
+      { upgrade: true, limit }
+    ),
+  RATE_LIMITED: () =>
+    errorResponse('API rate limit reached. Please wait a moment and try again.', 'RATE_LIMITED', 429, true),
+  CONTEXT_OVERFLOW: () =>
+    errorResponse('Session too long — too much conversation history. Start a new chat to continue.', 'CONTEXT_OVERFLOW', 413, true),
+  NETWORK_ERROR: (msg: string) =>
+    errorResponse(`Network error: ${msg}. Check your connection and try again.`, 'NETWORK_ERROR', 502, true),
+  API_ERROR: (msg: string) =>
+    errorResponse(`AI service error: ${msg}`, 'API_ERROR', 502, true),
+  NOT_CONFIGURED: (what: string) =>
+    errorResponse(`${what} is not configured. Set the required secrets and redeploy.`, 'NOT_CONFIGURED', 503),
+  INVALID_BODY: (example: object) =>
+    errorResponse('Invalid request body. Check the format and try again.', 'INVALID_BODY', 400, false, { example }),
+  NOT_FOUND: (path: string) =>
+    errorResponse(`Not found: ${path}`, 'NOT_FOUND', 404),
+  CHANNEL_DISABLED: (channel: string) =>
+    errorResponse(`${channel} is not configured. Enable it in cocapn.json and set the required secrets.`, 'CHANNEL_DISABLED', 400),
+  INTERNAL: (msg?: string) =>
+    errorResponse(msg || 'Internal server error. Please try again.', 'INTERNAL', 500, true),
+} as const;
+
 // ===== LLM Streaming =====
 async function streamChat(
   messages: ChatMessage[],
@@ -124,8 +161,25 @@ async function streamChat(
         });
 
         if (!response.ok) {
-          const error = await response.text();
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error })}\n\n`));
+          let errorMsg = `HTTP ${response.status}`;
+          let code = 'API_ERROR';
+          let retryable = false;
+          try { errorMsg = await response.text(); } catch { /* use default */ }
+
+          if (response.status === 429) {
+            errorMsg = 'API rate limit reached. Please wait a moment.';
+            code = 'RATE_LIMITED';
+            retryable = true;
+          } else if (response.status === 401 || response.status === 403) {
+            errorMsg = 'API key invalid or expired.';
+            code = 'API_ERROR';
+          } else if (response.status === 400 && errorMsg.includes('context')) {
+            errorMsg = 'Session too long — start a new chat.';
+            code = 'CONTEXT_OVERFLOW';
+            retryable = true;
+          }
+
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: errorMsg, code, retryable })}\n\n`));
           controller.enqueue(encoder.encode('data: [DONE]\n\n'));
           controller.close();
           return;
@@ -159,7 +213,8 @@ async function streamChat(
         controller.enqueue(encoder.encode('data: [DONE]\n\n'));
         controller.close();
       } catch (err) {
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: String(err) })}\n\n`));
+        const msg = err instanceof Error ? err.message : String(err);
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: `Network error: ${msg}`, code: 'NETWORK_ERROR', retryable: true })}\n\n`));
         controller.enqueue(encoder.encode('data: [DONE]\n\n'));
         controller.close();
       }
@@ -172,22 +227,37 @@ async function chatOnce(
   apiKey: string,
   model: string
 ): Promise<string> {
-  const response = await fetch('https://api.deepseek.com/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model,
-      messages,
-      max_tokens: 2048,
-      temperature: 0.7,
-    }),
-  });
+  let response: Response;
+  try {
+    response = await fetch('https://api.deepseek.com/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        max_tokens: 2048,
+        temperature: 0.7,
+      }),
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    throw Object.assign(new Error(`Network error contacting AI service: ${msg}`), { code: 'NETWORK_ERROR', retryable: true });
+  }
 
   if (!response.ok) {
-    throw new Error(`LLM API error: ${response.status} ${await response.text()}`);
+    let detail = '';
+    try { detail = await response.text(); } catch { /* use status */ }
+
+    if (response.status === 429) {
+      throw Object.assign(new Error('API rate limit reached. Wait a moment and try again.'), { code: 'RATE_LIMITED', retryable: true });
+    }
+    if (response.status === 400 && detail.includes('context')) {
+      throw Object.assign(new Error('Session too long — start a new chat.'), { code: 'CONTEXT_OVERFLOW', retryable: true });
+    }
+    throw Object.assign(new Error(`AI service error (${response.status}): ${detail}`), { code: 'API_ERROR', retryable: response.status >= 500 });
   }
 
   const data = await response.json() as { choices: Array<{ message: { content: string } }> };
@@ -271,11 +341,23 @@ async function handleChat(
   channel: string
 ): Promise<Response> {
   const startTime = Date.now();
-  const body = await request.json() as { message: string; stream?: boolean };
+
+  // Parse body safely
+  let body: { message?: string; stream?: boolean };
+  try {
+    body = await request.json() as { message: string; stream?: boolean };
+  } catch {
+    return ERRORS.INVALID_BODY({ message: 'Hello, who are you?', stream: true });
+  }
+
   const userMessage = body.message?.trim();
 
   if (!userMessage) {
-    return jsonResponse({ error: 'Message is required' }, 400);
+    return ERRORS.INVALID_BODY({ message: 'Your message here', stream: true });
+  }
+
+  if (userMessage.length > 10000) {
+    return ERRORS.BAD_REQUEST('Message too long (max 10,000 characters).');
   }
 
   // Load agent components
@@ -288,9 +370,13 @@ async function handleChat(
   const context = await buildContext(env.MEMORY, soul, history, userMessage);
   const systemPrompt = buildFullSystemPrompt(soul, context);
 
+  // Cap history to prevent context overflow
+  const maxHistory = 20;
+  const recentHistory = history.slice(-maxHistory);
+
   const messages: ChatMessage[] = [
     { role: 'system', content: systemPrompt },
-    ...history.slice(-10).map((m: { role: string; content: string }) => ({
+    ...recentHistory.map((m: { role: string; content: string }) => ({
       role: m.role as 'user' | 'assistant',
       content: m.content,
     })),
@@ -301,12 +387,21 @@ async function handleChat(
   await memory.addMessage(user, 'user', userMessage, channel);
 
   const apiKey = env.DEEPSEEK_API_KEY;
+  if (!apiKey) {
+    return ERRORS.NOT_CONFIGURED('DEEPSEEK_API_KEY');
+  }
   const model = env.MODEL || 'deepseek-chat';
 
   if (body.stream) {
     // Create a TransformStream so we can track the full response
     const { readable, writable } = new TransformStream();
-    const responseStream = await streamChat(messages, apiKey, model);
+    let responseStream: ReadableStream;
+    try {
+      responseStream = await streamChat(messages, apiKey, model);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return ERRORS.NETWORK_ERROR(msg);
+    }
 
     // Pipe through and collect for memory
     let fullResponse = '';
@@ -362,22 +457,29 @@ async function handleChat(
     });
   } else {
     // Non-streaming
-    const response = await chatOnce(messages, apiKey, model);
-    const elapsed = Date.now() - startTime;
+    try {
+      const response = await chatOnce(messages, apiKey, model);
+      const elapsed = Date.now() - startTime;
 
-    await memory.addMessage(user, 'assistant', response, channel);
-    await memory.extractAndStore(userMessage, response);
+      await memory.addMessage(user, 'assistant', response, channel);
+      await memory.extractAndStore(userMessage, response);
 
-    await recordAnalytics(env, {
-      timestamp: Date.now(),
-      channel,
-      user,
-      tokensIn: 0,
-      tokensOut: 0,
-      responseMs: elapsed,
-    });
+      await recordAnalytics(env, {
+        timestamp: Date.now(),
+        channel,
+        user,
+        tokensIn: 0,
+        tokensOut: 0,
+        responseMs: elapsed,
+      });
 
-    return jsonResponse({ response });
+      return jsonResponse({ response });
+    } catch (err: any) {
+      if (err.code === 'RATE_LIMITED') return ERRORS.RATE_LIMITED();
+      if (err.code === 'CONTEXT_OVERFLOW') return ERRORS.CONTEXT_OVERFLOW();
+      if (err.code === 'NETWORK_ERROR') return ERRORS.NETWORK_ERROR(err.message);
+      return ERRORS.API_ERROR(err.message || String(err));
+    }
   }
 }
 
@@ -420,11 +522,9 @@ export default {
     try {
       // ===== Static Routes =====
       if (method === 'GET' && path === '/') {
-        // Serve landing page — in production via Pages/Sites
-        return new Response(
-          '<!DOCTYPE html><html><head><meta http-equiv="refresh" content="0;url=/app"></head><body><p>Redirecting... <a href="/app">Open App</a></p></body></html>',
-          { headers: { 'Content-Type': 'text/html', ...corsHeaders() } }
-        );
+        return new Response(LANDING_HTML, {
+          headers: { 'Content-Type': 'text/html; charset=utf-8', ...corsHeaders() },
+        });
       }
 
       if (method === 'GET' && path === '/app') {
@@ -471,21 +571,20 @@ export default {
             user = decoded.user;
           }
         } else {
-          // Guest mode
-          const guestCount = parseInt(await env.MEMORY.get('_guest_count') || '0');
+          // Guest mode — track per IP
+          const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+          const guestKey = `_guest:${ip}`;
+          const guestCount = parseInt(await env.MEMORY.get(guestKey) || '0');
           const limit = parseInt(env.GUEST_LIMIT || '5');
           if (guestCount >= limit) {
             guestLimitReached = true;
           } else {
-            await env.MEMORY.put('_guest_count', String(guestCount + 1));
+            await env.MEMORY.put(guestKey, String(guestCount + 1));
           }
         }
 
         if (guestLimitReached) {
-          return jsonResponse({
-            error: 'Guest limit reached. Please authenticate for unlimited access.',
-            upgrade: true,
-          }, 429);
+          return ERRORS.GUEST_LIMIT(parseInt(env.GUEST_LIMIT || '5'));
         }
 
         return await handleChat(request, env, user, 'web');
@@ -501,7 +600,7 @@ export default {
         const filePath = decodeURIComponent(path.slice('/api/files/'.length));
         const content = await readFile(env, filePath);
         if (content === null) {
-          return jsonResponse({ error: 'File not found' }, 404);
+          return ERRORS.NOT_FOUND(`file:${filePath}`);
         }
         return new Response(content, {
           headers: { 'Content-Type': 'text/plain; charset=utf-8', ...corsHeaders() },
@@ -524,17 +623,17 @@ export default {
 
       // ===== Webhook Channels =====
       if (method === 'POST' && path === '/api/webhook/telegram') {
-        if (!env.TELEGRAM_BOT_TOKEN) return jsonResponse({ error: 'Telegram not configured' }, 400);
+        if (!env.TELEGRAM_BOT_TOKEN) return ERRORS.CHANNEL_DISABLED('Telegram');
         return await handleTelegram(request, env);
       }
 
       if (method === 'POST' && path === '/api/webhook/discord') {
-        if (!env.DISCORD_BOT_TOKEN) return jsonResponse({ error: 'Discord not configured' }, 400);
+        if (!env.DISCORD_BOT_TOKEN) return ERRORS.CHANNEL_DISABLED('Discord');
         return await handleDiscord(request, env);
       }
 
       if (method === 'POST' && path === '/api/webhook/whatsapp') {
-        if (!env.WHATSAPP_ACCESS_TOKEN) return jsonResponse({ error: 'WhatsApp not configured' }, 400);
+        if (!env.WHATSAPP_ACCESS_TOKEN) return ERRORS.CHANNEL_DISABLED('WhatsApp');
         return await handleWhatsApp(request, env);
       }
 
@@ -546,7 +645,7 @@ export default {
         if (mode === 'subscribe' && token === env.WHATSAPP_VERIFY_TOKEN) {
           return new Response(challenge, { status: 200 });
         }
-        return jsonResponse({ error: 'Invalid verification' }, 403);
+        return errorResponse('Invalid verification', 'FORBIDDEN', 403);
       }
 
       // ===== A2A Protocol =====
@@ -581,10 +680,11 @@ export default {
       }
 
       // 404
-      return jsonResponse({ error: 'Not found' }, 404);
+      return ERRORS.NOT_FOUND(path);
     } catch (err) {
-      console.error('[worker] Unhandled error:', err);
-      return jsonResponse({ error: 'Internal server error' }, 500);
+      const message = err instanceof Error ? err.message : String(err);
+      console.error('[worker] Unhandled error:', message);
+      return ERRORS.INTERNAL(message);
     }
   },
 };
