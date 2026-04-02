@@ -1,13 +1,162 @@
-import { loadBYOKConfig, callLLM, generateSetupHTML } from './lib/byok.js';
+import { WellnessEngine } from './lib/wellness-engine';
+import { MoodGraph } from './lib/mood-graph';
+import { HabitEngine } from './lib/habit-engine';
+import { DreamJournal } from './lib/dream-journal';
+import { GoalSystem } from './lib/goal-system';
+import { GrowthTracker } from './lib/growth';
+import { Journal } from './lib/journal';
 
-const indexHTML = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>PersonalLog.ai — Your Life, Logged</title><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Inter',system-ui,sans-serif;background:#0f0f0f;color:#d4d4d4;line-height:1.6}.hero{min-height:100vh;display:flex;align-items:center;justify-content:center;text-align:center;padding:2rem;background:radial-gradient(ellipse at 50% 0%,#1a1a0f 0%,#0f0f0f 70%)}.hero h1{font-size:clamp(2.5rem,6vw,4.5rem);background:linear-gradient(135deg,#fbbf24,#f59e0b);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:1rem}.hero p{font-size:1.25rem;color:#8a8a6a;max-width:600px;margin:0 auto 2rem}.cta{display:inline-block;padding:.8rem 2rem;background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#0f0f0f;border:none;border-radius:8px;font-size:1.1rem;cursor:pointer;text-decoration:none;font-weight:600}.cta:hover{transform:scale(1.05)}.features{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:2rem;padding:4rem 2rem;max-width:1200px;margin:0 auto}.card{background:#161616;border:1px solid #262626;border-radius:12px;padding:2rem}.card:hover{border-color:#fbbf24}.card h3{color:#fbbf24;margin-bottom:.5rem}.card p{color:#8a8a6a;font-size:.95rem}.gallery{padding:4rem 2rem;text-align:center}.gallery h2{margin-bottom:2rem;color:#fbbf24}.gallery-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1.5rem;max-width:1200px;margin:0 auto}.gallery-grid img{width:100%;border-radius:8px;border:1px solid #262626}.footer{text-align:center;padding:2rem;color:#4a4a3a;border-top:1px solid #1a1a1a;font-size:.85rem}</style></head><body><div class="hero"><div><h1>PersonalLog.ai</h1><p>Your life, logged. Wellness, relationships, mood, and growth.</p><a href="/setup" class="cta">Get Started</a></div></div><div class="features"><div class="card"><h3>💚 Wellness Engine</h3><p>Mood, journal, habits, goals, scoring.</p></div><div class="card"><h3>👥 Relationships</h3><p>Contacts, follow-ups, birthdays.</p></div><div class="card"><h3>📊 Mood Graph</h3><p>SVG visualizations and correlations.</p></div><div class="card"><h3>🎯 Goals & Habits</h3><p>Track, celebrate streaks.</p></div><div class="card"><h3>📝 Journal</h3><p>Daily entries with mood tagging.</p></div><div class="card"><h3>🔑 BYOK</h3><p>Your data, your key, your privacy.</p></div></div><div class="gallery"><h2>Your Life, Visualized</h2><div class="gallery-grid"><img src="/public/morning_journal_writing.png" alt="Journal"><img src="/public/meditation_peaceful_nature.png" alt="Meditation"><img src="/public/habit_tracker_calendar.png" alt="Habits"><img src="/public/relationship_web_connections.png" alt="Relationships"><img src="/public/wellness_dashboard.png" alt="Wellness"><img src="/public/gratitude_journal_open.png" alt="Gratitude"></div></div><div class="footer"><p>PersonalLog.ai — Part of the <a href="https://cocapn.ai" style="color:#fbbf24">Cocapn</a> ecosystem.</p></div></body></html>`;
+interface Env {
+	PERSONALLOG_MEMORY: KVNamespace;
+}
 
-export default { async fetch(request: Request, env: any) {
-  const url = new URL(request.url);
-  if (url.pathname === '/health') return new Response(JSON.stringify({ status: 'ok', repo: 'personallog-ai' }), { headers: { 'Content-Type': 'application/json' } });
-  if (url.pathname === '/setup') return new Response(generateSetupHTML('PersonalLog', '#fbbf24'), { headers: { 'Content-Type': 'text/html' } });
-  if (url.pathname === '/api/byok') { if (request.method === 'POST') { const d = await request.json(); env.PERSONALLOG_KV?.put('byok-config', JSON.stringify(d)); return new Response(JSON.stringify({ ok: true })); } const c = await env.PERSONALLOG_KV?.get('byok-config'); return new Response(c || '{}', { headers: { 'Content-Type': 'application/json' } }); }
-  if (url.pathname === '/api/chat') { const config = await loadBYOKConfig(request, env); if (!config) return new Response(JSON.stringify({ error: 'No LLM configured' }), { status: 400, headers: { 'Content-Type': 'application/json' } }); const body = await request.json(); const r = await callLLM(config, body.messages || [], { system: 'You are PersonalLog, a personal wellness and life management AI companion.' }); return new Response(JSON.stringify(r), { headers: { 'Content-Type': 'application/json' } }); }
-  if (url.pathname.startsWith('/public/')) { const kv = await env.PERSONALLOG_KV?.get('public:' + url.pathname, 'arrayBuffer'); if (kv) return new Response(kv, { headers: { 'Content-Type': url.pathname.endsWith('.png') ? 'image/png' : 'image/jpeg' } }); }
-  return new Response(indexHTML, { headers: { 'Content-Type': 'text/html' } });
-}};
+const serializeState = async (env: Env, key: string, data: any): Promise<void> => {
+	await env.PERSONALLOG_MEMORY.put(key, JSON.stringify(data));
+};
+
+const deserializeState = async <T>(env: Env, key: string): Promise<T | null> => {
+	const raw = await env.PERSONALLOG_MEMORY.get(key);
+	return raw ? JSON.parse(raw) : null;
+};
+
+const jsonResponse = (data: any, status = 200) =>
+	new Response(JSON.stringify(data), {
+		status,
+		headers: { 'Content-Type': 'application/json' },
+	});
+
+const errorHandler = (err: any) => {
+	console.error('Worker Error:', err);
+	return jsonResponse({ success: false, error: err.message || 'Internal Server Error' }, 500);
+};
+
+export default {
+	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+		const url = new URL(request.url);
+		const path = url.pathname;
+		const method = request.method;
+
+		try {
+			// ==============================
+			// MOOD ROUTES
+			// ==============================
+			if (path === '/api/mood' && method === 'POST') {
+				const moodGraph = new MoodGraph((await deserializeState(env, 'mood-graph')) || undefined);
+				const body = await request.json() as { mood: string; note?: string; energy?: number; tags?: string[] };
+				
+				if (!body.mood) {
+					return jsonResponse({ success: false, error: 'Mood is required' }, 400);
+				}
+
+				const entry = moodGraph.logMood(body.mood, body.note, body.energy, body.tags);
+				await serializeState(env, 'mood-graph', moodGraph);
+				return jsonResponse({ success: true, data: entry }, 201);
+			}
+
+			if (path === '/api/mood/history' && method === 'GET') {
+				const moodGraph = new MoodGraph((await deserializeState(env, 'mood-graph')) || undefined);
+				const history = moodGraph.getHistory();
+				const graphData = moodGraph.getGraphData ? moodGraph.getGraphData() : history;
+				return jsonResponse({ success: true, data: { history, graphData } });
+			}
+
+			// ==============================
+			// HABITS ROUTES
+			// ==============================
+			if (path === '/api/habits' && method === 'POST') {
+				const habitEngine = new HabitEngine((await deserializeState(env, 'habit-engine')) || undefined);
+				const body = await request.json() as { habit: string; completed: boolean };
+				
+				if (!body.habit || typeof body.completed === 'undefined') {
+					return jsonResponse({ success: false, error: 'Habit name and completed status are required' }, 400);
+				}
+
+				const result = body.completed 
+					? habitEngine.completeHabit(body.habit) 
+					: habitEngine.logHabit(body.habit, body.completed);
+				
+				await serializeState(env, 'habit-engine', habitEngine);
+				return jsonResponse({ success: true, data: result }, 201);
+			}
+
+			if (path === '/api/habits' && method === 'GET') {
+				const habitEngine = new HabitEngine((await deserializeState(env, 'habit-engine')) || undefined);
+				const habits = habitEngine.getAllHabits ? habitEngine.getAllHabits() : habitEngine.getHabits();
+				return jsonResponse({ success: true, data: habits });
+			}
+
+			// ==============================
+			// DREAMS ROUTES
+			// ==============================
+			if (path === '/api/dreams' && method === 'POST') {
+				const dreamJournal = new DreamJournal((await deserializeState(env, 'dream-journal')) || undefined);
+				const body = await request.json() as { title: string; description?: string; mood?: string; lucid?: boolean; tags?: string[] };
+				
+				if (!body.title) {
+					return jsonResponse({ success: false, error: 'Dream title is required' }, 400);
+				}
+
+				const dream = dreamJournal.logDream(body.title, body.description, body.mood, body.lucid, body.tags);
+				await serializeState(env, 'dream-journal', dreamJournal);
+				return jsonResponse({ success: true, data: dream }, 201);
+			}
+
+			if (path === '/api/dreams' && method === 'GET') {
+				const dreamJournal = new DreamJournal((await deserializeState(env, 'dream-journal')) || undefined);
+				const dreams = dreamJournal.getRecentDreams ? dreamJournal.getRecentDreams() : dreamJournal.getDreams();
+				return jsonResponse({ success: true, data: dreams });
+			}
+
+			// ==============================
+			// GOALS ROUTES
+			// ==============================
+			if (path === '/api/goals' && method === 'POST') {
+				const goalSystem = new GoalSystem((await deserializeState(env, 'goal-system')) || undefined);
+				const body = await request.json() as { id?: string; title: string; description?: string; target?: number; progress?: number };
+				
+				if (!body.title) {
+					return jsonResponse({ success: false, error: 'Goal title is required' }, 400);
+				}
+
+				const goal = body.id 
+					? goalSystem.updateGoal(body.id, body) 
+					: goalSystem.createGoal(body.title, body.description, body.target);
+				
+				await serializeState(env, 'goal-system', goalSystem);
+				return jsonResponse({ success: true, data: goal }, 201);
+			}
+
+			if (path === '/api/goals' && method === 'GET') {
+				const goalSystem = new GoalSystem((await deserializeState(env, 'goal-system')) || undefined);
+				const goals = goalSystem.getAllGoals ? goalSystem.getAllGoals() : goalSystem.getGoals();
+				return jsonResponse({ success: true, data: goals });
+			}
+
+			// ==============================
+			// WELLNESS ROUTES
+			// ==============================
+			if (path === '/api/wellness' && method === 'POST') {
+				const wellnessEngine = new WellnessEngine((await deserializeState(env, 'wellness-engine')) || undefined);
+				const body = await request.json() as { sleep?: number; exercise?: number; nutrition?: number; stress?: number };
+				
+				const check = wellnessEngine.logWellness(body);
+				await serializeState(env, 'wellness-engine', wellnessEngine);
+				return jsonResponse({ success: true, data: check }, 201);
+			}
+
+			if (path === '/api/wellness' && method === 'GET') {
+				const wellnessEngine = new WellnessEngine((await deserializeState(env, 'wellness-engine')) || undefined);
+				const summary = wellnessEngine.getSummary ? wellnessEngine.getSummary() : wellnessEngine.getStatus();
+				return jsonResponse({ success: true, data: summary });
+			}
+
+			// ==============================
+			// 404 FALLBACK
+			// ==============================
+			return jsonResponse({ success: false, error: 'Not Found' }, 404);
+
+		} catch (err) {
+			return errorHandler(err);
+		}
+	},
+};
