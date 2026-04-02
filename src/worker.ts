@@ -34,10 +34,22 @@ const errorHandler = (err: any) => {
 	return jsonResponse({ success: false, error: err.message || 'Internal Server Error' }, 500);
 };
 
+function landing(): string {
+  return `<!DOCTYPE html><html><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width">
+<title>PersonalLog.ai — Your Personal Intelligence Engine</title>
+<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:system-ui;background:#0a0a1a;color:#e0e0e0}.hero{background:linear-gradient(135deg,#6366f1,#06b6d4);padding:4rem 2rem;text-align:center}.hero h1{font-size:3rem;background:linear-gradient(90deg,#a5b4fc,#06b6d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:1rem}.hero p{color:#94a3b8;font-size:1.1rem;max-width:600px;margin:0 auto}.footer{text-align:center;padding:2rem;color:#334;font-size:.8rem;border-top:1px solid #111}</style></head><body>
+<div class="hero"><h1>PersonalLog.ai</h1><p>Your Personal Intelligence Engine — mood tracking, dream journaling, habit building, goal setting, and wellness insights.</p></div>
+<div class="footer">PersonalLog.ai — Part of the Cocapn Ecosystem</div>
+</body></html>`;
+}
+
 export default {
 	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
 		const url = new URL(request.url);
 		const path = url.pathname;
+
+		if (path === '/') return new Response(landing(), { headers: { 'Content-Type': 'text/html;charset=utf-8' } });
 		const method = request.method;
 
 		try {
