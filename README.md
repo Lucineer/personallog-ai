@@ -1,85 +1,92 @@
-# PersonalLog — Your Personal AI That Remembers Everything
+# PersonalLog.ai
 
-> *The simplest cocapn vessel. Fork it, add your API key, deploy. It works.*
+> Personal Growth AI — part of the [Cocapn](https://cocapn.ai) ecosystem
 
-## What It Is
+![Build](https://img.shields.io/badge/build-passing-brightgreen) ![License](https://img.shields.io/badge/license-MIT-blue) ![TypeScript](https://img.shields.io/badge/TypeScript-20_files-blue) ![Lines](https://img.shields.io/badge/lines-3140-green)
 
-PersonalLog is a personal AI companion that lives in your repo. It remembers every conversation, every preference, every context. It's not a chatbot that forgets you between sessions — it's an AI that grows with you.
+## ✨ Features
 
-## Why It's Different
+- Wellness engine
+-  relationship tracker
+-  mood graph
+-  habit engine
+-  dream journal
 
-Every AI chatbot starts fresh. PersonalLog starts where you left off. After a week, it knows your routines. After a month, it anticipates your needs. After a year, it's irreplaceable.
-
-This is possible because **the repo IS the agent**. Every conversation, every preference, every piece of context lives in your repo. You own it. You control it. No corporation can take it away.
-
-## Features
-
-- 💬 **Persistent chat** — remembers every conversation
-- 🧠 **Smart context** — prioritizes recent > relevant > old (~4K tokens)
-- 🔒 **Private by default** — your data, your repo, your control
-- 🌐 **Deploy anywhere** — Cloudflare Workers (free), Docker, local
-- 🔑 **BYOK** — bring any LLM key (DeepSeek, Claude, GPT, Ollama)
-- 📱 **Mobile-ready** — works on phone, tablet, desktop
-- 🎨 **Clean UI** — simple, fast, no bloat
-
-## Quick Start
+## 🚀 Quick Start
 
 ```bash
-# 1. Fork on GitHub
-# 2. Clone your fork
-git clone https://github.com/YOUR_USERNAME/personallog-ai.git
+git clone https://github.com/Lucineer/personallog-ai.git
 cd personallog-ai
-
-# 3. Install
 npm install
-
-# 4. Run locally (free)
-DEEPSEEK_API_KEY=your-key npx wrangler dev
-
-# 5. Open http://localhost:8787
+npx wrangler dev
 ```
 
-## Deploy to Cloudflare (free tier)
+## 🤖 Claude Code Integration
+
+Optimized for Claude Code with full agent support:
+
+- **CLAUDE.md** — Complete project context, conventions, and architecture
+- **.claude/agents/** — 3 specialized sub-agents for exploration, architecture, and review
+- **.claude/settings.json** — Permissions and plugin configuration
+
+Just run `claude` in the repo directory and the agent has full context.
+
+## 🏗️ Architecture
+
+| Component | File | Description |
+|-----------|------|-------------|
+| Worker | `src/worker.ts` | Cloudflare Worker with inline HTML |
+| BYOK | `src/lib/byok.ts` | 7 LLM providers, encrypted keys |
+| Health | `/health` | Health check endpoint |
+| Setup | `/setup` | BYOK configuration wizard |
+| Chat | `/api/chat` | LLM chat endpoint |
+| Assets | `/public/*` | KV-served images |
+
+**Zero runtime dependencies.** Pure TypeScript on Cloudflare Workers.
+
+## 🔑 BYOK (Bring Your Own Key)
+
+Supports 7 LLM providers — no vendor lock-in:
+
+- OpenAI (GPT-4, GPT-4o)
+- Anthropic (Claude 3.5, Claude 4)
+- Google (Gemini Pro, Gemini Flash)
+- DeepSeek (Chat, Reasoner)
+- Groq (Llama, Mixtral)
+- Mistral (Large, Medium)
+- OpenRouter (100+ models)
+
+Configuration discovery: URL params → Auth header → Cookie → KV → fail.
+
+## 📦 Deployment
 
 ```bash
-# Set your API key
-npx wrangler secret put DEEPSEEK_API_KEY
-
-# Deploy
 npx wrangler deploy
-
-# Your AI is live at your-subdomain.workers.dev
 ```
 
-## Deploy with Custom Domain
+Requires `CLOUDFLARE_ACCOUNT_ID` and `CLOUDFLARE_API_TOKEN` environment variables.
 
-```bash
-# In Cloudflare dashboard, add custom domain to your Worker
-# Point your DNS: personallog.yourdomain.com → your Worker
-```
+## 📊 Stats
 
-## The Two-Repo Model
+- **20** TypeScript files
+- **3140** lines of code
+- **7** LLM providers
+- **0** runtime dependencies
+- **3** specialized Claude Code agents
 
-PersonalLog works best with two repos:
-1. **Public repo** (this one) — the face, the UI, the public personality
-2. **Private repo** — the brain, the memories, the secrets
+## 🔗 Links
 
-The public repo has no secrets. The private repo has everything. The cocapn gateway ensures secrets never leak.
+- 🌐 **Live**: https://personallog-ai.magnus-digennaro.workers.dev
+- ❤️ **Health**: https://personallog-ai.magnus-digennaro.workers.dev/health
+- ⚙️ **Setup**: https://personallog-ai.magnus-digennaro.workers.dev/setup
+- 🧠 **Cocapn**: https://cocapn.ai
+- 📚 **Papermill**: https://github.com/Lucineer/papermill
+- 📋 **All Repos**: https://github.com/Lucineer
 
-## Build Status
+## 📜 License
 
-✅ Working — boots locally and on Cloudflare Workers
-✅ SSE streaming chat with DeepSeek
-✅ Session management
-✅ Dark theme UI
-✅ Mobile responsive
-✅ Guest mode (5 free messages)
-📝 Roadmap: BYOK provider switching, Docker support, A2A bridge
+MIT
 
-## Philosophy
+---
 
-Less is more. PersonalLog does one thing well: it remembers you. No features you'll never use. No bloat. Just a clean, fast AI that grows with you.
-
-The most important product is the simplest one that works.
-
-Author: Superinstance
+Built with ❤️ by [SuperInstance](https://github.com/superinstance)
