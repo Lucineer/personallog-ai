@@ -22,7 +22,11 @@ const deserializeState = async <T>(env: Env, key: string): Promise<T | null> => 
 const jsonResponse = (data: any, status = 200) =>
 	new Response(JSON.stringify(data), {
 		status,
-		headers: { 'Content-Type': 'application/json' },
+		headers: {
+			'Content-Type': 'application/json',
+			'Access-Control-Allow-Origin': '*',
+			'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com https://api.deepseek.com https://api.groq.com https://api.mistral.ai https://openrouter.ai https://api.z.ai https://*;",
+		},
 	});
 
 const errorHandler = (err: any) => {
