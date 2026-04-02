@@ -38,6 +38,13 @@ export default {
 
 		try {
 			// ==============================
+			// HEALTH CHECK
+			// ==============================
+			if (path === '/health' && method === 'GET') {
+				return jsonResponse({ status: 'ok', repo: 'personallog-ai', modules: ['mood', 'habits', 'dreams', 'goals', 'wellness', 'journal', 'growth'] });
+			}
+
+			// ==============================
 			// MOOD ROUTES
 			// ==============================
 			if (path === '/api/mood' && method === 'POST') {
