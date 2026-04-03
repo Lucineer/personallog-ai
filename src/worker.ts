@@ -1,3 +1,4 @@
+import { softActualize, confidenceScore } from './lib/soft-actualize.js';
 import { WellnessEngine } from './lib/wellness-engine';
 import { MoodGraph } from './lib/mood-graph';
 import { HabitEngine } from './lib/habit-engine';
@@ -57,10 +58,18 @@ export default {
 			// HEALTH CHECK
 			// ==============================
 			if (path === '/health' && method === 'GET') {
-				return jsonResponse({ status: 'ok', repo: 'personallog-ai', modules: ['mood', 'habits', 'dreams', 'goals', 'wellness', 'journal', 'growth'] });
+				return jsonResponse({ status: 'ok', repo: 'personallog-ai', version: '1.1.0', agentCount: 1, modules: ['mood','habits','dreams','goals','wellness','journal','growth','seed'], seedVersion: '2024.04', timestamp: Date.now() });
 			}
 
 			// ==============================
+			// SEED ROUTE
+			if (path === '/api/seed' && method === 'GET') {
+				return jsonResponse({ domain: 'personallog-ai', description: 'Personal intelligence engine — wellness, mood, habits, goals', seedVersion: '2024.04',
+					frameworks: ['CBT journaling','mindfulness','positive psychology','habit loop','SMART goals','sleep hygiene','stress management'],
+					prompts: ['What are you grateful for today?','How is your energy on a 1-10 scale?','What challenged you?','What did you learn?'],
+					systemPrompt: 'You are PersonalLog, a wellness and personal growth companion.' });
+			}
+
 			// MOOD ROUTES
 			// ==============================
 			if (path === '/api/mood' && method === 'POST') {
