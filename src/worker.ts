@@ -107,12 +107,11 @@ export default {
 
 					const sysContent = `You are PersonalLog.ai, a personal wellness and habit tracking assistant.\n[Model routing: tier ${decision.tier} — ${decision.reason}]`;
 					const messages = [{ role: 'system', content: sysContent }, ...(body.messages || [{ role: 'user', content: body.message || '' }])];
-					const resp = await callLLM(apiKey, messages);
+					const result = await evapPipeline(env, lastMsg, () => callLLM(apiKey, messages), 'personallog-ai');
 
 					tracker.record(topic, true);
 					await env.PERSONALLOG_MEMORY.put('confidence-state', tracker.serialize());
-					await recordMiss(env.PERSONALLOG_MEMORY);
-					return jsonResponse({ success: true, response: resp, _tier: decision.tier, _topic: topic, _confidence: conf.score });
+					return jsonResponse({ success: true, response: result.response, source: result.source, tokensUsed: result.tokensUsed, _tier: decision.tier, _topic: topic, _confidence: conf.score });
 				} catch (e: any) { return jsonResponse({ success: false, error: e.message }, 500); }
 			}
 			if (path === '/health' && method === 'GET') {
