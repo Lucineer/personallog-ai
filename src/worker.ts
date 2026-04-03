@@ -71,6 +71,9 @@ export default {
 			}
 
 			// --- Phase 1B: Confidence tracking ---
+			if (path === '/api/evaporation' && method === 'GET') { return jsonResponse({ hot: [], warm: [], coverage: 0, repo: 'personallog-ai', timestamp: Date.now() }); }
+			if (path === '/api/kg' && method === 'GET') { return jsonResponse({ nodes: [], edges: [], domain: 'personallog-ai', timestamp: Date.now() }); }
+			if (path === '/api/memory' && method === 'GET') { return jsonResponse({ patterns: [], repo: 'personallog-ai', timestamp: Date.now() }); }
 			if (path === '/api/confidence' && method === 'GET') {
 				const tracker = getTracker();
 				const saved = await env.PERSONALLOG_MEMORY.get('confidence-state');
