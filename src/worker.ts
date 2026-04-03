@@ -1,4 +1,6 @@
 import { callLLM, generateSetupHTML } from './lib/byok.js';
+import { deadbandCheck, deadbandStore } from './lib/deadband.js';
+import { loadStats, recordHit, recordMiss } from './lib/response-logger.js';
 import { softActualize, confidenceScore } from './lib/soft-actualize.js';
 import { WellnessEngine } from './lib/wellness-engine';
 import { MoodGraph } from './lib/mood-graph';
@@ -63,13 +65,18 @@ export default {
 				return new Response(generateSetupHTML('personallog-ai', '#4f46e5'), { headers: { 'Content-Type': 'text/html;charset=utf-8' } });
 			}
 
+			if (path === '/api/efficiency' && method === 'GET') { return jsonResponse(await loadStats(env.PERSONALLOG_MEMORY)); }
 			if (path === '/api/chat' && method === 'POST') {
 				try {
 					const body = await request.json();
 					const apiKey = (env as any)?.OPENAI_API_KEY || (env as any)?.ANTHROPIC_API_KEY || (env as any)?.GEMINI_API_KEY;
 					if (!apiKey) return jsonResponse({ success: false, error: 'No API key configured. Visit /setup.' }, 503);
+					const lastMsg = (body.messages?.slice(-1)[0]?.content) || body.message || '';
+					const cached = await deadbandCheck(env.PERSONALLOG_MEMORY, lastMsg, 'personallog');
+					if (cached) { await recordHit(env.PERSONALLOG_MEMORY); return jsonResponse({ success: true, response: cached.response, fromCache: true }); }
 					const messages = [{ role: 'system', content: 'You are PersonalLog.ai, a personal wellness and habit tracking assistant.' }, ...(body.messages || [{ role: 'user', content: body.message || '' }])];
 					const resp = await callLLM(apiKey, messages);
+					await recordMiss(env.PERSONALLOG_MEMORY);
 					return jsonResponse({ success: true, response: resp });
 				} catch (e: any) { return jsonResponse({ success: false, error: e.message }, 500); }
 			}
