@@ -1,3 +1,4 @@
+import { callLLM, generateSetupHTML } from './lib/byok.js';
 import { softActualize, confidenceScore } from './lib/soft-actualize.js';
 import { WellnessEngine } from './lib/wellness-engine';
 import { MoodGraph } from './lib/mood-graph';
@@ -53,10 +54,28 @@ export default {
 		if (path === '/') return new Response(landing(), { headers: { 'Content-Type': 'text/html;charset=utf-8' } });
 		const method = request.method;
 
+		if (method === 'OPTIONS') {
+			return new Response(null, { headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type,Authorization' } });
+		}
+
 		try {
 			// ==============================
 			// HEALTH CHECK
 			// ==============================
+			if (path === '/setup' && method === 'GET') {
+				return new Response(generateSetupHTML('personallog-ai', '#4f46e5'), { headers: { 'Content-Type': 'text/html;charset=utf-8' } });
+			}
+
+			if (path === '/api/chat' && method === 'POST') {
+				try {
+					const body = await request.json();
+					const apiKey = (env as any)?.OPENAI_API_KEY || (env as any)?.ANTHROPIC_API_KEY || (env as any)?.GEMINI_API_KEY;
+					if (!apiKey) return jsonResponse({ success: false, error: 'No API key configured. Visit /setup.' }, 503);
+					const messages = [{ role: 'system', content: 'You are PersonalLog.ai, a personal wellness and habit tracking assistant.' }, ...(body.messages || [{ role: 'user', content: body.message || '' }])];
+					const resp = await callLLM(apiKey, messages);
+					return jsonResponse({ success: true, response: resp });
+				} catch (e: any) { return jsonResponse({ success: false, error: e.message }, 500); }
+			}
 			if (path === '/health' && method === 'GET') {
 				return jsonResponse({ status: 'ok', repo: 'personallog-ai', version: '1.1.0', agentCount: 1, modules: ['mood','habits','dreams','goals','wellness','journal','growth','seed'], seedVersion: '2024.04', timestamp: Date.now() });
 			}
