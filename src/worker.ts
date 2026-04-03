@@ -1,3 +1,4 @@
+import { evapPipeline, getEvapReport, getLockStats } from './lib/evaporation-pipeline.js';
 import { callLLM, generateSetupHTML } from './lib/byok.js';
 import { deadbandCheck, deadbandStore } from './lib/deadband.js';
 import { loadStats, recordHit, recordMiss } from './lib/response-logger.js';
