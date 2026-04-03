@@ -9,6 +9,8 @@ import { DreamJournal } from './lib/dream-journal';
 import { GoalSystem } from './lib/goal-system';
 import { GrowthTracker } from './lib/growth';
 import { Journal } from './lib/journal';
+import { getTracker } from './lib/confidence-tracker.js';
+import { getRouter } from './lib/model-router.js';
 
 interface Env {
 	PERSONALLOG_MEMORY: KVNamespace;
@@ -65,6 +67,23 @@ export default {
 				return new Response(generateSetupHTML('personallog-ai', '#4f46e5'), { headers: { 'Content-Type': 'text/html;charset=utf-8' } });
 			}
 
+			// --- Phase 1B: Confidence tracking ---
+			if (path === '/api/confidence' && method === 'GET') {
+				const tracker = getTracker();
+				const saved = await env.PERSONALLOG_MEMORY.get('confidence-state');
+				if (saved) tracker.deserialize(saved);
+				return jsonResponse(tracker.getAll());
+			}
+			if (path === '/api/confidence' && method === 'POST') {
+				const tracker = getTracker();
+				const saved = await env.PERSONALLOG_MEMORY.get('confidence-state');
+				if (saved) tracker.deserialize(saved);
+				const { topic, success } = await request.json();
+				tracker.record(topic, typeof success === 'boolean' ? success : true);
+				await env.PERSONALLOG_MEMORY.put('confidence-state', tracker.serialize());
+				return jsonResponse(tracker.get(topic));
+			}
+
 			if (path === '/api/efficiency' && method === 'GET') { return jsonResponse(await loadStats(env.PERSONALLOG_MEMORY)); }
 			if (path === '/api/chat' && method === 'POST') {
 				try {
@@ -74,10 +93,25 @@ export default {
 					const lastMsg = (body.messages?.slice(-1)[0]?.content) || body.message || '';
 					const cached = await deadbandCheck(env.PERSONALLOG_MEMORY, lastMsg, 'personallog');
 					if (cached) { await recordHit(env.PERSONALLOG_MEMORY); return jsonResponse({ success: true, response: cached.response, fromCache: true }); }
-					const messages = [{ role: 'system', content: 'You are PersonalLog.ai, a personal wellness and habit tracking assistant.' }, ...(body.messages || [{ role: 'user', content: body.message || '' }])];
+
+					// Confidence-aware routing
+					const tracker = getTracker();
+					const router = getRouter();
+					const saved = await env.PERSONALLOG_MEMORY.get('confidence-state');
+					if (saved) tracker.deserialize(saved);
+
+					const topic = tracker.classify(lastMsg);
+					const conf = tracker.get(topic);
+					const decision = router.route(topic, conf.score, conf.count);
+
+					const sysContent = `You are PersonalLog.ai, a personal wellness and habit tracking assistant.\n[Model routing: tier ${decision.tier} — ${decision.reason}]`;
+					const messages = [{ role: 'system', content: sysContent }, ...(body.messages || [{ role: 'user', content: body.message || '' }])];
 					const resp = await callLLM(apiKey, messages);
+
+					tracker.record(topic, true);
+					await env.PERSONALLOG_MEMORY.put('confidence-state', tracker.serialize());
 					await recordMiss(env.PERSONALLOG_MEMORY);
-					return jsonResponse({ success: true, response: resp });
+					return jsonResponse({ success: true, response: resp, _tier: decision.tier, _topic: topic, _confidence: conf.score });
 				} catch (e: any) { return jsonResponse({ success: false, error: e.message }, 500); }
 			}
 			if (path === '/health' && method === 'GET') {
