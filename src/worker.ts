@@ -124,6 +124,7 @@ export default {
 			if (path === '/health' && method === 'GET') {
 				return jsonResponse({ status: 'ok', repo: 'personallog-ai', version: '1.1.0', agentCount: 1, modules: ['mood','habits','dreams','goals','wellness','journal','growth','seed'], seedVersion: '2024.04', timestamp: Date.now() });
 			}
+  if (path === '/vessel.json') { try { const vj = await import('./vessel.json', { with: { type: 'json' } }); return jsonResponse(vj.default || vj); } catch { return jsonResponse({}); } }
 
 			// ==============================
 			// SEED ROUTE
