@@ -4,69 +4,85 @@
 
 <h1 align="center">personallog-ai</h1>
 
-<p align="center">A personal AI agent you host from your own repository. Free, open-source, fork-and-deploy.</p>
+<p align="center">A personal AI agent that runs in your own repository.</p>
 
 <p align="center">
   <a href="#quick-start">Quick Start</a> ·
   <a href="#features">Features</a> ·
-  <a href="#limitations">Limitations</a> ·
-  <a href="#the-fleet">The Fleet</a>
+  <a href="#limitations">Limitations</a>
 </p>
 
 ---
 
-**Example:** [personallog-ai.casey-digennaro.workers.dev](https://personallog-ai.casey-digennaro.workers.dev)
-Built on Capitaine. Part of the Cocapn Fleet. Attributions: Superinstance & Lucineer (DiGennaro et al.).
+**Live Example:** [personallog-ai](https://personallog-ai.casey-digennaro.workers.dev)
 
-You can host an AI agent that belongs to you. It runs from a repository you control, with code you can see. It doesn't train on your data unless you configure it to.
-
-This is a deployable worker, not a service. Fork it, set your keys, and host it yourself.
+You don't need another chat interface. You might need an agent that stays where you work and remembers what you let it. This is a single-file Cloudflare Worker that provides that, using only the keys you provide.
 
 ---
 
+## Why this exists
+
+Most AI agents are hosted by third parties. They hold your memory, can change features, or shut down. This is built the other way: you fork it, run it on your infrastructure, and control its memory. It's part of the open Cocapn Fleet.
+
+## What it does
+
+1.  **Fork to deploy**  
+    No login or waitlist. You can have a private instance running in a few minutes.
+2.  **Repository as state**  
+    Configuration and state live in git. You can audit changes.
+3.  **Minimal cost**  
+    Runs on Cloudflare Workers, typically within the free tier.
+4.  **Fleet capable**  
+    Implements the CRP-39 fleet protocol for collaboration with other vessels.
+
 ## Quick Start
 
-You need a GitHub account and a Cloudflare account. Then:
+Fork the repository, then:
 
 ```bash
-# Fork and clone
-gh repo fork Lucineer/personallog-ai --clone
 cd personallog-ai
-
-# Log into Cloudflare Workers
 npx wrangler login
-
-# Set your API keys as secrets (never in git)
-echo "your-github-token" | npx wrangler secret put GITHUB_TOKEN
-echo "your-llm-key" | npx wrangler secret put DEEPSEEK_API_KEY
-
-# Deploy
+# Set your GitHub token and LLM API key as secrets
+echo "your_token" | npx wrangler secret put GITHUB_TOKEN
+echo "your_key" | npx wrangler secret put DEEPSEEK_API_KEY
 npx wrangler deploy
 ```
 
-Your instance will run at the generated `.workers.dev` URL.
+Your instance will be live at the generated Workers URL.
 
 ## Features
 
-- **Bring Your Own Keys v2** — Credentials stored in Cloudflare Secrets, not code.
-- **Multi-model routing** — Compatible with DeepSeek, SiliconFlow, DeepInfra, and other OpenAI-compatible endpoints.
-- **Context persistence** — Session memory stored as markdown in your repository.
-- **PII detection** — Basic redaction for phone numbers and emails before sending to LLMs.
-- **Per-IP rate limiting** — Prevents single-user overuse on public endpoints.
-- **Health endpoint** — Standard `/health` for uptime checks.
-- **Fleet protocol** — Implements CRP-39 for peer discovery via public git.
+- **BYOK v2** — Credentials stored in Cloudflare Secrets, not code.
+- **Multi-model support** — Works with DeepSeek, SiliconFlow, DeepInfra, Moonshot, z.ai, and local endpoints.
+- **Session memory** — Conversations persist with long-term context.
+- **PII safety** — Detects and dehydrates sensitive data before LLM calls.
+- **Rate limiting** — Configurable limits per IP.
+- **Health checks** — Standard `/health` endpoint.
+- **Fleet coordination** — CRP-39 implementation for cross-vessel events.
 
 ## Limitations
 
-This is a single-file Cloudflare Worker. It stores conversation state as markdown files in your repository. It does not have a built-in database or support for high-volume, concurrent usage. You are responsible for the costs of your LLM API calls.
+This is a stateless worker. While session memory persists across invocations, it does not currently implement a long-term vector database for semantic search across all past conversations.
 
-## The Fleet
+## Architecture
 
-This repository follows the open [Cocapn Fleet Protocol](https://the-fleet.casey-digennaro.workers.dev). It's part of a network of independent, self-hosted agents that can discover each other through git.
+Single-file Cloudflare Worker with no runtime dependencies. Inline HTML serving. No external databases required.
+
+```
+src/
+  worker.ts      # Main worker
+lib/
+  byok.ts        # Multi-model routing
+  memory.ts      # Session memory
+  pii.ts         # PII detection
+```
 
 ---
 
 <div align="center">
-  <a href="https://the-fleet.casey-digennaro.workers.dev">The Fleet</a> ·
-  <a href="https://cocapn.ai">Cocapn</a>
+  <p>
+    Part of the <a href="https://the-fleet.casey-digennaro.workers.dev">Cocapn Fleet</a> · 
+    <a href="https://cocapn.ai">Cocapn Protocol</a>
+  </p>
+  <p>Attribution: Superinstance & Lucineer (DiGennaro et al.)</p>
 </div>
